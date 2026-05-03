@@ -1,0 +1,58 @@
+# NOTE: Python 3.14+ users - If you get build errors, use Python 3.11 or 3.12 instead
+# Or run: pip install --upgrade pip wheel before installing
+
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+starlette>=0.35.0
+
+# WhatsApp Integration (Twilio)
+twilio>=8.12.0
+PyJWT>=2.8.0
+
+# AI Integration (Groq for LLaMA 3.3 70B)
+groq>=0.4.2
+
+# Google Gemini AI for Image/Video Analysis
+google-genai>=1.0.0
+
+# RAG System - Semantic Search Embeddings
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+
+# Language Detection
+langdetect>=1.0.9
+langid>=1.1.6
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+# Pydantic v2 with settings support
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Utilities
+requests>=2.31.0
+aiohttp>=3.9.1
+python-dateutil>=2.8.2
+typing-extensions>=4.8.0
+pathlib>=1.0.1
+
+# Web Search (DuckDuckGo - no API key required)
+duckduckgo-search>=3.9.6
+
+# Database - MongoDB Atlas (primary) with SQLite fallback
+pymongo>=4.6.1
+dnspython>=2.4.0
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+aiosqlite>=0.19.0
+
+# Testing
+pytest>=7.4.4
+pytest-asyncio>=0.23.3
+httpx>=0.26.0
+
+# Development
+black>=23.12.1
+flake8>=7.0.0

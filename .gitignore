@@ -1,0 +1,198 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# ============================================
+# REACT FRONTEND
+# ============================================
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+package-lock.json
+yarn.lock
+
+# testing
+/coverage
+
+# production
+/build
+dist/
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# PYTHON BACKEND
+# ============================================
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# Python distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# celery
+-celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments (IMPORTANT - keep secrets out of git!)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# ============================================
+# SECRETS & CONFIGURATION (NEVER COMMIT!)
+# ============================================
+backend/.env
+backend/.env.*
+backend/config/local.py
+backend/config/production.py
+backend/instance/
+*.key
+*.pem
+*.cert
+secrets/
+credentials/
+
+# ============================================
+# LOGS & DATA
+# ============================================
+*.log
+logs/
+log/
+*.sqlite
+*.sqlite3
+*.db
+data/
+database/
+uploads/
+uploaded_files/
+voice_files/
+audio/
+media/
+
+# ============================================
+# IDE & EDITOR FILES
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.un~
+*.sublime-project
+*.sublime-workspace
+.atom/
+.brackets.json
+
+# ============================================
+# OS SPECIFIC
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# DEPLOYMENT & TEMP FILES
+# ============================================
+*.bak
+*.tmp
+*.temp
+tmp/
+temp/
+.cache/
+.terraform/
+*.tfstate
+*.tfstate.*
+.ansible/
+*.retry
+
+# ============================================
+# NGROK / TUNNELING
+# ============================================
+ngrok*
+ngrok.yml
+ngrok.yaml
+
+# ============================================
+# DOCKER
+# ============================================
+.dockerignore
+Dockerfile.*
+docker-compose.*.yml
+!docker-compose.yml
+!Dockerfile
