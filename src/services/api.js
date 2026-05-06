@@ -460,3 +460,237 @@ export const getWeatherByName = async (location, userId = 'web_user') => {
     };
   }
 };
+
+// ============ AUTHENTICATION API ============
+
+/**
+ * Authentication API endpoints
+ */
+export const authAPI = {
+  /**
+   * Register a new user
+   */
+  register: async (userData) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Login user
+   */
+  login: async (phone_number, password) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ phone_number, password }),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Verify email with code
+   */
+  verifyEmail: async (user_id, code) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user_id, code }),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Resend verification email
+   */
+  resendVerification: async (user_id) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user_id }),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Forgot password
+   */
+  forgotPassword: async (email) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Reset password with token
+   */
+  resetPassword: async (token, new_password, confirm_password) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token, new_password, confirm_password }),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Get current user info
+   */
+  getCurrentUser: async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return await response.json();
+  },
+
+  /**
+   * Update user profile
+   */
+  updateProfile: async (updates) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(updates),
+    });
+    return await response.json();
+  },
+
+  /**
+   * Logout user
+   */
+  logout: async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return await response.json();
+  },
+
+  /**
+   * Google OAuth
+   */
+  googleAuth: {
+    // Redirect to Google OAuth
+    initiate: () => {
+      window.location.href = `${API_BASE_URL}/api/auth/google`;
+    },
+    
+    // Handle OAuth callback
+    handleCallback: async (token) => {
+      if (token) {
+        localStorage.setItem('token', token);
+        return { success: true };
+      }
+      return { success: false };
+    }
+  }
+};
+
+/**
+ * Helper function to get auth headers for API calls
+ */
+export const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  } : {
+    'Content-Type': 'application/json',
+  };
+};
+
+/**
+ * Enhanced uploadFile with authentication
+ */
+export const uploadFileAuth = async (file, context = '') => {
+  try {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    if (context) {
+      formData.append('context', context);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      method: 'POST',
+      body: formData,
+      headers: token ? {
+        'Authorization': `Bearer ${token}`,
+      } : {},
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('File upload error:', error);
+    return {
+      success: false,
+      message: 'Failed to upload file. Please try again.',
+    };
+  }
+};
+
+/**
+ * Enhanced sendChatMessage with authentication
+ */
+export const sendChatMessageAuth = async (message, context = '') => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        message,
+        context,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Chat API Error:', error);
+    return {
+      success: true,
+      message: "I'm having trouble connecting to the server. Please try again in a moment. 🙏",
+    };
+  }
+};

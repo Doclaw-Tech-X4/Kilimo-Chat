@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Sprout, ScanLine, BadgeCheck, Repeat2, Mic, Sun, ShoppingBag, MessageCircle, ChevronRight, Sparkles } from 'lucide-react';
 import DockNavigation from './DockNavigation';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Check if splash was already shown in this session
   const hasSeenSplash = sessionStorage.getItem('kilimoSplashShown') === 'true';
@@ -14,18 +16,20 @@ const HomePage = () => {
   const [typedText, setTypedText] = useState('');
 
   // Welcome message for typewriter effect
-  const welcomeMessage = "Karibu! Welcome to KilimoChat 🌾";
+  const welcomeMessage = user 
+    ? `Karibu ${user.full_name?.split(' ')[0] || ''}! Welcome to KilimoChat 🌾`
+    : "Karibu! Welcome to KilimoChat 🌾";
 
-  // Flash screen animation sequence - 5 seconds total
+  // Flash screen animation sequence - 3 seconds total
   useEffect(() => {
     // Only run splash animation if it hasn't been shown this session
     if (!hasSeenSplash) {
       // Mark splash as shown immediately
       sessionStorage.setItem('kilimoSplashShown', 'true');
       
-      const timer1 = setTimeout(() => setSplashPhase(1), 800);      // Start animations
-      const timer2 = setTimeout(() => setSplashPhase(2), 2500);    // Begin fade out
-      const timer3 = setTimeout(() => setShowSplash(false), 5000); // Remove splash
+      const timer1 = setTimeout(() => setSplashPhase(1), 500);      // Start animations
+      const timer2 = setTimeout(() => setSplashPhase(2), 2000);    // Begin fade out
+      const timer3 = setTimeout(() => setShowSplash(false), 3000); // Remove splash after 3 seconds
 
       return () => {
         clearTimeout(timer1);
@@ -33,7 +37,7 @@ const HomePage = () => {
         clearTimeout(timer3);
       };
     }
-  }, []);
+  }, [hasSeenSplash]);
 
   // Typewriter effect for welcome text
   useEffect(() => {
@@ -43,7 +47,7 @@ const HomePage = () => {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [showSplash, typedText]);
+  }, [showSplash, typedText, welcomeMessage]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
@@ -132,7 +136,7 @@ const HomePage = () => {
                 {/* Quick action buttons */}
                 <div className="flex gap-2 mt-4">
                   <button 
-                    onClick={() => navigate('/chat')}
+                    onClick={() => navigate('/expertchat')}
                     className="flex items-center gap-1 bg-white text-[#0f7e39] px-4 py-2 rounded-full text-sm font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
                   >
                     <MessageCircle className="h-4 w-4" />
@@ -295,7 +299,7 @@ const HomePage = () => {
               </p>
               <button
                 type="button"
-                onClick={() => navigate('/chat')}
+                onClick={() => navigate('/expertchat')}
                 className="group mx-auto mt-4 flex w-full max-w-[330px] items-center justify-center gap-2 rounded-full bg-white py-3 text-title font-semibold text-[#0f7e39] shadow-lg hover:shadow-xl hover:scale-105 hover:bg-[#f0f0f0] transition-all duration-300"
               >
                 <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />

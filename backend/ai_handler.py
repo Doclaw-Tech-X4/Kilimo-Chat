@@ -21,10 +21,14 @@ from search_handler import search_and_get_context, SearchContext
 from weather_handler import needs_weather_data, get_weather_response
 from database import save_search_log
 from knowledge_base import search_knowledge, get_kb_stats
+from document_ingestion import get_ingestion_pipeline
 from language_utils import translate_response
 
 # RAG threshold - minimum confidence to use knowledge base answer
 RAG_CONFIDENCE_THRESHOLD = 0.75
+
+# Fast timeout for chat responses (seconds) - impatient farmers need quick answers
+FAST_CHAT_TIMEOUT = 6  # Even faster than before
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -77,36 +81,24 @@ THIS IS MANDATORY. IGNORE ALL OTHER LANGUAGE INSTRUCTIONS IN THIS PROMPT."""
         system_prompt = system_prompt.replace("use simple English", "tumia Kiswahili rahisi")
         system_prompt = system_prompt.replace("Mix in Swahili words", "Tumia maneno ya Kiingereza kama ni lazima")
     
-    # ===== RAG: Check Knowledge Base First =====
-    kb_result = search_knowledge(user_message, top_k=3, threshold=0.7)
+    # ===== FAST PATH: Check Local Sources First =====
+    # 1. Check Knowledge Base (KALRO, FAO, Ministry facts)
+    kb_result = search_knowledge(user_message, top_k=3, threshold=0.65)
     
     if kb_result["found"] and kb_result["confidence"] >= RAG_CONFIDENCE_THRESHOLD:
-        # High-confidence match found in knowledge base
-        logger.info(f"✅ RAG: Knowledge base match (confidence: {kb_result['confidence']}) for: {user_message[:50]}...")
+        logger.info(f"✅ KB match (confidence: {kb_result['confidence']}) for: {user_message[:50]}...")
+        return _format_kb_response(kb_result, target_language)
+    
+    # 2. Check Uploaded Documents (admin uploads)
+    try:
+        pipeline = get_ingestion_pipeline()
+        doc_results = _search_uploaded_documents(user_message, pipeline)
         
-        # Format verified answer with citation
-        verified_answer = kb_result["answer"]
-        source = kb_result["source"]
-        crop = kb_result.get("matched_crop", "")
-        
-        # Translate if target language is Swahili (knowledge base is in English)
-        if target_language == "sw":
-            verified_answer = translate_response(verified_answer, "sw")
-            source_label = "Kutoka"  # Swahili for "From"
-            verified_label = "info iliyoidhinishwa"  # Swahili for "verified info"
-            for_label = "Kwa"  # Swahili for "For"
-        else:
-            source_label = "From"
-            verified_label = "verified info"
-            for_label = "For"
-        
-        # Add citation and context - simple format for farmers
-        rag_response = f"""{verified_answer}
-
-📚 {source_label}: {source} ({verified_label})
-🌾 {for_label}: {crop.capitalize() if crop else 'General farming'}"""
-        
-        return rag_response
+        if doc_results and doc_results.get("found"):
+            logger.info(f"✅ Document match from {doc_results['source']} for: {user_message[:50]}...")
+            return _format_document_response(doc_results, target_language)
+    except Exception as e:
+        logger.debug(f"Document search failed: {e}")
     
     # Log if RAG didn't find match
     if kb_result["all_matches"]:
@@ -171,7 +163,7 @@ Please answer using both your knowledge, the web search results, and any verifie
                 messages=messages,
                 temperature=0.7,
                 max_tokens=1024,
-                timeout=REQUEST_TIMEOUT,
+                timeout=4,
             )
             
             ai_response = response.choices[0].message.content.strip()
@@ -349,7 +341,7 @@ Please answer using both your knowledge, the web search results, and any verifie
             messages=messages,
             temperature=0.7,
             max_tokens=1024,
-            timeout=REQUEST_TIMEOUT,
+            timeout=FAST_CHAT_TIMEOUT,  # Changed to FAST_CHAT_TIMEOUT
             stream=True,  # Enable streaming
         )
         
@@ -392,6 +384,87 @@ def format_search_results_text(results: List[Any]) -> str:
         formatted.append(f"   {result.snippet[:200]}...")
     
     return "\n".join(formatted)
+
+
+def _format_kb_response(kb_result: dict, target_language: str) -> str:
+    """Format knowledge base response for user."""
+    verified_answer = kb_result["answer"]
+    source = kb_result["source"]
+    crop = kb_result.get("matched_crop", "")
+    
+    # Translate if needed
+    if target_language == "sw":
+        verified_answer = translate_response(verified_answer, "sw")
+        response = f"""{verified_answer}
+
+📚 Kutoka: {source} (info iliyoidhinishwa)
+🌾 Kwa: {crop.capitalize() if crop else 'Mkulima'}"""
+    else:
+        response = f"""{verified_answer}
+
+📚 From: {source} (verified info)
+🌾 For: {crop.capitalize() if crop else 'Farmers'}"""
+    
+    return response
+
+
+def _search_uploaded_documents(query: str, pipeline) -> dict:
+    """Search uploaded documents for relevant information."""
+    documents = pipeline.list_documents()
+    
+    if not documents:
+        return None
+    
+    # Simple keyword search across all document facts
+    query_words = set(query.lower().split())
+    best_match = None
+    best_score = 0
+    
+    for doc in documents:
+        facts = doc.get("extracted_facts", [])
+        for fact in facts:
+            # Check question and answer
+            fact_text = f"{fact.get('question', '')} {fact.get('answer', '')}".lower()
+            fact_words = set(fact_text.split())
+            
+            # Calculate overlap
+            overlap = len(query_words & fact_words)
+            score = overlap / len(query_words) if query_words else 0
+            
+            if score > best_score and score > 0.3:  # Threshold
+                best_score = score
+                best_match = {
+                    "found": True,
+                    "answer": fact.get("answer"),
+                    "question": fact.get("question"),
+                    "source": doc.get("source_type", "Document"),
+                    "title": doc.get("title"),
+                    "crop": fact.get("crop", "general"),
+                    "score": score
+                }
+    
+    return best_match
+
+
+def _format_document_response(doc_results: dict, target_language: str) -> str:
+    """Format uploaded document response for user."""
+    answer = doc_results["answer"]
+    source = doc_results["source"]
+    title = doc_results.get("title", "")
+    
+    if target_language == "sw":
+        answer = translate_response(answer, "sw")
+        response = f"""{answer}
+
+📄 Kutoka: {source}
+📖 Hati: {title}"""
+    else:
+        response = f"""{answer}
+
+📄 From: {source}
+📖 Document: {title}"""
+    
+    return response
 
 
 def get_fallback_response(language: str = "en") -> str:

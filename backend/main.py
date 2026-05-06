@@ -82,6 +82,40 @@ except ImportError:
     GEMINI_AVAILABLE = False
     logger.warning("Gemini handler not available for file analysis")
 
+# Import TTS handler
+try:
+    from tts_handler import ELEVENLABS_API_KEY
+    TTS_AVAILABLE = bool(ELEVENLABS_API_KEY)
+    if TTS_AVAILABLE:
+        logger.info("✅ ElevenLabs TTS configured - human-like voice enabled")
+    else:
+        logger.info("ℹ️ ElevenLabs API key not set - using browser TTS fallback")
+except ImportError:
+    TTS_AVAILABLE = False
+    logger.warning("TTS handler not available")
+
+# Import Auth handler
+try:
+    from auth_handler import JWT_SECRET
+    logger.info(f"JWT_SECRET found: {bool(JWT_SECRET)}")
+    AUTH_AVAILABLE = bool(JWT_SECRET)
+    if AUTH_AVAILABLE:
+        from auth_routes import auth_router
+        from database_auth import init_auth_collections
+        logger.info("✅ Authentication system configured")
+        logger.info(f"Auth router loaded: {auth_router is not None}")
+    else:
+        logger.warning("⚠️ JWT_SECRET not set - authentication disabled")
+        auth_router = None
+except ImportError as e:
+    AUTH_AVAILABLE = False
+    auth_router = None
+    logger.warning(f"Authentication module import error: {e}")
+except Exception as e:
+    AUTH_AVAILABLE = False
+    auth_router = None
+    logger.error(f"Unexpected error loading auth: {e}")
+
 # Initialize FastAPI app
 app = FastAPI(
     title=APP_NAME,
@@ -100,6 +134,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include auth router
+if auth_router:
+    logger.info("Including auth router in FastAPI app...")
+    app.include_router(auth_router)
+    logger.info("Auth router included successfully")
+else:
+    logger.warning("Auth router not available - authentication endpoints will not work")
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -107,12 +149,25 @@ async def startup_event():
     logger.info(f"🚀 {APP_NAME} v{APP_VERSION} starting up...")
     init_database()
     
+    # Initialize auth collections if MongoDB is available
+    if AUTH_AVAILABLE:
+        try:
+            init_auth_collections()
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to initialize auth collections: {e}")
+    
     if MISSING_CONFIG:
         logger.warning(f"⚠️  Missing config: {', '.join(MISSING_CONFIG)}")
     else:
         logger.info("✅ All environment variables configured")
     
     logger.info("✅ Database initialized")
+    
+    # Pre-load knowledge base at startup (prevents 6s delay on first request)
+    from knowledge_base import get_knowledge_base
+    kb = get_knowledge_base()
+    logger.info(f"✅ Knowledge base ready ({kb.get_stats()['total_facts']} facts)")
+    
     logger.info("✅ AI Service ready (Groq)")
     logger.info("✅ Voice pipeline ready (Whisper)")
     logger.info("✅ Web search ready (DuckDuckGo)")
@@ -254,6 +309,81 @@ async def knowledge_search(request: Request):
             "success": False,
             "error": str(e)
         }
+
+
+@app.post("/api/admin/documents/upload")
+async def admin_upload_document(
+    file: UploadFile = File(...),
+    source_type: str = Form("KALRO"),
+    title: str = Form(None),
+    compliance_approved: bool = Form(False)
+):
+    """Admin endpoint to upload PDF documents (KALRO/FAO/Ministry)."""
+    try:
+        from document_ingestion import get_ingestion_pipeline
+        
+        # Save uploaded file temporarily
+        temp_path = f"uploads/temp_{file.filename}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(temp_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # Process document
+        pipeline = get_ingestion_pipeline()
+        result = pipeline.ingest_pdf(
+            file_path=temp_path,
+            source_type=source_type,
+            title=title or file.filename,
+            compliance_approved=compliance_approved
+        )
+        
+        # Cleanup temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": f"Document uploaded successfully",
+                "document_id": result["document_id"],
+                "facts_extracted": result["facts_count"]
+            }
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result.get("error", "Upload failed")}
+            )
+            
+    except Exception as e:
+        logger.error(f"Document upload error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+
+@app.get("/api/admin/documents")
+async def admin_list_documents():
+    """List all ingested documents."""
+    try:
+        from document_ingestion import get_ingestion_pipeline
+        
+        pipeline = get_ingestion_pipeline()
+        documents = pipeline.list_documents()
+        
+        return {
+            "success": True,
+            "documents": documents,
+            "count": len(documents)
+        }
+    except Exception as e:
+        logger.error(f"List documents error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
 
 
 @app.get("/api/knowledge/export")
@@ -847,7 +977,7 @@ async def upload_file(
                 if gemini_result.get("success"):
                     analysis = gemini_result['analysis']
                     logger.info(f"✅ Gemini analysis successful: {analysis[:100]}...")
-                    message = f"📷 **Image Analysis**\n\n{analysis}"
+                    message = analysis
                     ai_response = analysis
                 else:
                     # Gemini failed - log error and use friendly message
@@ -1028,6 +1158,8 @@ async def process_voice_message_api(
 async def text_to_speech(request: Request):
     """
     Generate text-to-speech audio for bot responses.
+    Uses ElevenLabs for human-like professional voice.
+    Automatically cleans text for natural speech.
     """
     try:
         data = await request.json()
@@ -1040,34 +1172,28 @@ async def text_to_speech(request: Request):
                 content={"success": False, "error": "Text is required"}
             )
         
-        # For now, return a placeholder
-        # In production, integrate with:
-        # - Google Cloud Text-to-Speech
-        # - Azure TTS
-        # - ElevenLabs
-        # - Amazon Polly
+        # Import TTS handler
+        from tts_handler import generate_speech, format_for_agricultural_advice
         
-        # For demo purposes, we'll return a mock audio URL
-        # The frontend will handle cases where TTS is not available
+        # Generate speech with cleaned text
+        result = generate_speech(text, language)
         
-        logger.info(f"TTS request: {text[:50]}... in {language}")
+        logger.info(f"TTS request processed: {text[:50]}...")
         
-        # Placeholder: In production, generate actual audio file
-        # and return its URL
-        
-        return {
-            "success": True,
-            "audio_url": None,  # Set to actual URL when TTS is implemented
-            "message": "TTS not yet implemented. Bot response will be text-only.",
-            "text": text
-        }
+        return result
         
     except Exception as e:
         logger.error(f"TTS error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": str(e)}
-        )
+        # Return cleaned text for browser fallback
+        from tts_handler import format_for_agricultural_advice
+        cleaned = format_for_agricultural_advice(text)
+        return {
+            "success": True,
+            "audio_url": None,
+            "text": cleaned,
+            "use_browser_tts": True,
+            "message": "Using browser TTS fallback"
+        }
 
 
 # Serve uploaded files
@@ -1083,6 +1209,22 @@ async def serve_file(filename: str):
         return JSONResponse(
             status_code=404,
             content={"error": "File not found"}
+        )
+
+
+# Serve TTS audio files
+@app.get("/audio/{filename}")
+async def serve_audio(filename: str):
+    """Serve TTS audio files."""
+    from fastapi.responses import FileResponse
+    
+    file_path = Path("audio_cache") / filename
+    if file_path.exists():
+        return FileResponse(file_path, media_type="audio/mpeg")
+    else:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Audio file not found"}
         )
 
 
@@ -1295,9 +1437,20 @@ async def chat_message(request: Request):
             ai_response=ai_response
         )
         
+        # Generate TTS audio automatically
+        audio_url = None
+        try:
+            from tts_handler import generate_speech
+            tts_result = generate_speech(ai_response, language)
+            if tts_result.get("success"):
+                audio_url = tts_result.get("audio_url")
+        except Exception as e:
+            logger.warning(f"TTS generation failed: {e}")
+        
         return {
             "success": True,
             "message": ai_response,
+            "audio_url": audio_url,
             "user_id": user_id,
             "language": language,
             "timestamp": datetime.now().isoformat()
@@ -1399,24 +1552,30 @@ async def chat_upload_image(
                 if "disease" in analysis_lower or "pest" in analysis_lower or "fungus" in analysis_lower:
                     disease = "potential issue detected"
                 
+                ai_response = analysis
+                
+                # Generate TTS for image analysis
+                audio_url = None
+                try:
+                    from tts_handler import generate_speech
+                    tts_result = generate_speech(ai_response, "en", is_image_analysis=True)
+                    if tts_result.get("success"):
+                        audio_url = tts_result.get("audio_url")
+                except Exception as e:
+                    logger.warning(f"TTS generation failed for image: {e}")
+                
                 response_data = {
                     "success": True,
                     "analysis": analysis,
                     "crop": crop,
                     "disease": disease,
-                    "user_id": user_id,
-                    "file_url": f"/uploads/files/{safe_filename}"
+                    "audio_url": audio_url,
+                    "user_id": user_id
                 }
-                
-                ai_response = analysis
-                
             else:
-                error_msg = gemini_result.get('error', 'Analysis failed')
-                logger.error(f"❌ Gemini analysis failed: {error_msg}")
-                
                 response_data = {
                     "success": False,
-                    "error": "Image analysis failed. Please try again or describe the image.",
+                    "error": "Image analysis is currently unavailable. Please describe what you see.",
                     "user_id": user_id
                 }
                 ai_response = response_data["error"]

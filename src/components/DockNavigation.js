@@ -8,16 +8,19 @@ const DockNavigation = () => {
   const currentPath = location.pathname;
 
   const navItems = [
-    { path: '/', icon: Home, label: 'Home' },
-    { path: '/chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/home', icon: Home, label: 'Home' },
+    { path: '/expertchat', icon: MessageCircle, label: 'Chat' },
     { path: '/market', icon: ShoppingBag, label: 'Market' },
     { path: '/weather', icon: Sun, label: 'Weather' },
-    { path: '/about', icon: HelpCircle, label: 'Help' },
+    { path: '/help', icon: HelpCircle, label: 'Help' },
   ];
 
   const isActive = (path) => {
-    if (path === '/') {
-      return currentPath === '/';
+    if (path === '/home') {
+      return currentPath === '/home';
+    }
+    if (path === '/expertchat') {
+      return currentPath === '/expertchat';
     }
     return currentPath.startsWith(path);
   };
