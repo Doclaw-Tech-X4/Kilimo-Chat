@@ -661,11 +661,30 @@ def get_ai_response_for_voice(
 async def api_chat(request: Request):
     """
     Direct chat API endpoint (for testing without WhatsApp).
+    Supports both authenticated users (via JWT) and anonymous users.
     """
     try:
         data = await request.json()
         message = data.get("message", "")
+        context = data.get("context", "")
         user_id = data.get("user_id", "api_user")
+        
+        # Try to extract authenticated user from JWT token
+        auth_header = request.headers.get("authorization", "")
+        authenticated_user = None
+        if auth_header and auth_header.startswith("Bearer "):
+            try:
+                import auth_handler
+                token = auth_header.split(" ")[1]
+                payload = auth_handler.verify_jwt_token(token)
+                if payload:
+                    # Get user from auth system - use phone_number as the user identifier
+                    from database_auth import get_auth_user_by_id
+                    authenticated_user = get_auth_user_by_id(payload.get("user_id"))
+                    if authenticated_user and authenticated_user.get("phone_number"):
+                        user_id = authenticated_user["phone_number"]  # Use phone number for profile lookup
+            except Exception as e:
+                logger.debug(f"Auth extraction failed: {e}")
         
         if not message:
             return JSONResponse(
@@ -677,7 +696,7 @@ async def api_chat(request: Request):
         detected_language = detect_language(message)
         user = get_or_create_user(user_id, detected_language)
         
-        # Get AI response
+        # Get AI response with user profile context
         ai_response = get_ai_response(
             user_message=message,
             user_phone=user_id,
@@ -1366,6 +1385,7 @@ async def chat_message(request: Request):
     """
     Web chat endpoint: Send text message, get AI response.
     Maintains conversation history per user.
+    Supports authenticated users via JWT token for profile integration.
     
     Request body:
     {
@@ -1387,6 +1407,21 @@ async def chat_message(request: Request):
         user_message = data.get("message", "").strip()
         user_id = data.get("user_id", "web_user")
         language = data.get("language", "en")
+        
+        # Try to extract authenticated user from JWT token
+        auth_header = request.headers.get("authorization", "")
+        if auth_header and auth_header.startswith("Bearer "):
+            try:
+                import auth_handler
+                token = auth_header.split(" ")[1]
+                payload = auth_handler.verify_jwt_token(token)
+                if payload:
+                    from database_auth import get_auth_user_by_id
+                    authenticated_user = get_auth_user_by_id(payload.get("user_id"))
+                    if authenticated_user and authenticated_user.get("phone_number"):
+                        user_id = authenticated_user["phone_number"]
+            except Exception as e:
+                logger.debug(f"Auth extraction failed in chat_message: {e}")
         
         if not user_message:
             return JSONResponse(

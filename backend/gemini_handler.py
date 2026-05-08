@@ -130,38 +130,34 @@ FORBIDDEN (DO NOT WRITE THESE):
 - "I will analyze"
 - Any greeting or introduction
 
-REQUIRED: Start immediately with 🌱 CROP IDENTIFIED
+REQUIRED: Start immediately with 📌 SUMMARY:
 
-OUTPUT THIS EXACT FORMAT:
+OUTPUT THIS EXACT FORMAT (5 SECTIONS ONLY):
 
-🌱 CROP IDENTIFIED
-• Crop: [English name] ([Swahili name])
-• Stage: [seedling/vegetative/flowering/fruiting/maturity]
+📌 SUMMARY:
+[What you see in the image: crop name, visible problem, and severity in 2-3 sentences]
 
-🔍 OBSERVATIONS
-• Healthy parts: [describe]
-• Problem areas: [describe in detail]
-• Disease/Pest identified: [specific name or "None visible"]
-• Severity: [Mild/Moderate/Severe/Not applicable]
+📋 DETAILS FROM SEARCH:
+- Crop identified: [English name] ([Swahili name])
+- Growth stage: [seedling/vegetative/flowering/fruiting/maturity]
+- Problem: [disease/pest name or "No visible problem"]
+- Severity: [Mild/Moderate/Severe/None]
+- Affected areas: [which parts of plant are affected]
 
-💊 RECOMMENDED TREATMENT
-• Natural/Organic: [specific product + exact rate]
-• Chemical option: [Kenyan product name + exact rate]
-• Application method: [how to apply]
-• Safety precautions: [PPE, waiting period]
+🎯 WHAT TO DO:
+1. [Immediate action - e.g., "Remove infected plants/leaves"]
+2. [Apply treatment - specific product and method]
+3. [Prevention - how to avoid this in future]
+4. [Monitoring - how to check if treatment is working]
 
-📅 ACTION PLAN
-• When to apply: [time of day, weather conditions]
-• Frequency: [how often, for how long]
-• Immediate actions: [what to do today]
+💰 COSTS:
+- Natural/Organic option: [product name]: Ksh [amount]
+- Chemical option: [product name]: Ksh [amount]
+- Where to buy: [agrovet/shop name]
+💰 Prices as of 2024 from agricultural suppliers
 
-💰 ESTIMATED COST (KSH)
-• Product cost: [Ksh X per Y quantity]
-• Where to buy: [agrovet name/location]
-
-⚠️ IMPORTANT NOTES
-• [Warning if urgent]
-• [Additional advice]
+📊 WHERE INFO CAME FROM:
+From: Agricultural expert analysis based on crop image and verified farming knowledge
 
 If you cannot identify something clearly, write: "Cannot identify clearly from this image."""
         

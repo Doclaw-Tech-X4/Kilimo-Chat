@@ -52,6 +52,13 @@ def init_auth_collections():
         auth_users.create_index("reset_token")
         auth_users.create_index("created_at")
         
+        # User profiles collection
+        user_profiles: Collection = db.user_profiles
+        user_profiles.create_index("user_id", unique=True)
+        user_profiles.create_index("county")
+        user_profiles.create_index("crop_types")
+        user_profiles.create_index("updated_at")
+        
         # User uploads collection metadata
         uploads_meta: Collection = db.uploads_metadata
         uploads_meta.create_index("user_id")
@@ -483,6 +490,67 @@ def delete_user_file(user_id: str, file_id: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to delete file: {e}")
         return False
+
+
+# User Profile Functions
+def get_user_profile(user_id: str) -> Optional[Dict]:
+    """
+    Get user profile by user ID.
+    Returns profile dict or None if not found.
+    """
+    if db is None:
+        return None
+    
+    try:
+        user_profiles: Collection = db.user_profiles
+        profile = user_profiles.find_one({"user_id": user_id})
+        
+        if profile:
+            # Convert ObjectId to string
+            profile['_id'] = str(profile['_id'])
+            return profile
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to get user profile: {e}")
+        return None
+
+
+def create_or_update_user_profile(user_id: str, profile_data: Dict) -> Tuple[bool, str]:
+    """
+    Create or update user profile.
+    Returns: (success, message)
+    """
+    if db is None:
+        return False, "Database not connected"
+    
+    try:
+        user_profiles: Collection = db.user_profiles
+        
+        # Add timestamps
+        profile_data['user_id'] = user_id
+        profile_data['updated_at'] = datetime.utcnow()
+        
+        # Check if profile exists
+        existing = user_profiles.find_one({"user_id": user_id})
+        
+        if existing:
+            # Update existing profile
+            user_profiles.update_one(
+                {"user_id": user_id},
+                {"$set": profile_data}
+            )
+            return True, "Profile updated successfully"
+        else:
+            # Create new profile
+            profile_data['created_at'] = datetime.utcnow()
+            user_profiles.insert_one(profile_data)
+            return True, "Profile created successfully"
+        
+    except Exception as e:
+        logger.error(f"Failed to save user profile: {e}")
+        return False, f"Failed to save profile: {str(e)}"
 
 
 # Initialize collections on module import

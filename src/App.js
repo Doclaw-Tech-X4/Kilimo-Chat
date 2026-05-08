@@ -11,6 +11,7 @@ import EmailVerificationPage from './components/auth/EmailVerificationPage';
 // App Pages
 import HomePage from './components/HomePage';
 import AboutPage from './components/AboutPage';
+import UserProfilePage from './components/UserProfilePage';
 import ExpertChatPage from './components/ExpertChatPage';
 import RecordPage from './components/RecordPage';
 import WeatherPage from './components/WeatherPage';
@@ -58,6 +59,11 @@ function App() {
             <Route path="/help" element={
               <ProtectedRoute>
                 <AboutPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <UserProfilePage />
               </ProtectedRoute>
             } />
             <Route path="/admin" element={

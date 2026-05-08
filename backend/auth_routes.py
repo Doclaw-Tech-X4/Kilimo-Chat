@@ -13,7 +13,8 @@ from database_auth import (
     create_auth_user, get_auth_user_by_phone, get_auth_user_by_email,
     get_auth_user_by_id, update_verification_code, verify_email_code,
     set_password_reset_token, verify_reset_token, reset_password,
-    update_last_login, update_user_profile
+    update_last_login, update_user_profile,
+    get_user_profile, create_or_update_user_profile
 )
 from config import logger
 
@@ -519,3 +520,94 @@ async def google_callback(request: Request):
         logger.error(f"Google auth error: {e}")
         frontend_url = auth_handler.os.getenv("FRONTEND_URL", "http://localhost:3000")
         return RedirectResponse(f"{frontend_url}/login?error=google_auth_failed")
+
+
+# ============ Farmer Profile Endpoints ============
+
+class FarmerProfileRequest(BaseModel):
+    location: Optional[str] = None
+    county: Optional[str] = None
+    sub_county: Optional[str] = None
+    ward: Optional[str] = None
+    crop_types: Optional[list] = None
+    farm_size: Optional[str] = None
+    farm_size_unit: Optional[str] = None
+    water_access_level: Optional[str] = None
+    soil_type: Optional[str] = None
+    farming_experience: Optional[str] = None
+    primary_farming_activity: Optional[str] = None
+    phone_number_alt: Optional[str] = None
+    preferred_language: Optional[str] = None
+
+
+@auth_router.get("/profile")
+async def get_profile(current_user: dict = Depends(get_current_user)):
+    """
+    Get farmer profile for the authenticated user.
+    """
+    try:
+        profile = get_user_profile(current_user["_id"])
+        
+        if profile:
+            # Remove internal fields
+            profile.pop('_id', None)
+            profile.pop('user_id', None)
+            return {
+                "success": True,
+                "profile": profile
+            }
+        
+        # Return empty profile if not created yet
+        return {
+            "success": True,
+            "profile": {
+                "location": "",
+                "county": "",
+                "sub_county": "",
+                "ward": "",
+                "crop_types": [],
+                "farm_size": "",
+                "farm_size_unit": "acres",
+                "water_access_level": "",
+                "soil_type": "",
+                "farming_experience": "",
+                "primary_farming_activity": "",
+                "phone_number_alt": "",
+                "preferred_language": "Swahili"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching profile: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile")
+
+
+@auth_router.post("/profile")
+async def update_profile(
+    request: FarmerProfileRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Create or update farmer profile for the authenticated user.
+    """
+    try:
+        # Convert request to dict, excluding None values
+        profile_data = {k: v for k, v in request.dict().items() if v is not None}
+        
+        # Update or create profile
+        success, message = create_or_update_user_profile(
+            current_user["_id"],
+            profile_data
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "message": message
+            }
+        else:
+            raise HTTPException(status_code=400, detail=message)
+        
+    except Exception as e:
+        logger.error(f"Error updating profile: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")

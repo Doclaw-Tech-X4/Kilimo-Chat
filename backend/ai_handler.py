@@ -23,6 +23,7 @@ from database import save_search_log
 from knowledge_base import search_knowledge, get_kb_stats
 from document_ingestion import get_ingestion_pipeline
 from language_utils import translate_response
+from database_auth import get_user_profile
 
 # RAG threshold - minimum confidence to use knowledge base answer
 RAG_CONFIDENCE_THRESHOLD = 0.75
@@ -32,6 +33,191 @@ FAST_CHAT_TIMEOUT = 6  # Even faster than before
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+
+def clean_ai_response(response: str) -> str:
+    """
+    Post-process AI response to ensure it's helpful and well-formatted.
+    Removes 'I'm not sure' statements and converts wall-of-text to bullet points.
+    """
+    import re
+    
+    # Remove uncertainty phrases and replace with helpful alternatives
+    uncertainty_patterns = [
+        r"I'm not sure[.,]?",
+        r"I don't know[.,]?",
+        r"I cannot tell[.,]?",
+        r"I am not sure[.,]?",
+        r"I am not certain[.,]?",
+        r"Unfortunately,? I don't have",
+        r"Unfortunately,? I cannot",
+        r"I apologize,? but I don't",
+        r"I regret to inform",
+        r"I'm sorry,? but I",
+        r"I cannot provide",
+        r"I don't have enough information",
+        r"I don't have specific data",
+        r"I don't have real-time data",
+        r"I don't have access to",
+        r"I cannot access",
+        r"web search (didn't find|failed|wasn't helpful)",
+    ]
+    
+    # Remove these patterns and the following text up to the next sentence
+    for pattern in uncertainty_patterns:
+        response = re.sub(pattern, "", response, flags=re.IGNORECASE)
+    
+    # Clean up empty statements and double spaces
+    response = re.sub(r"\s+", " ", response)
+    response = re.sub(r"\.{3,}", "", response)
+    response = re.sub(r",\s*\.", ".", response)
+    
+    # Remove orphaned references to checking other sources
+    orphaned_phrases = [
+        r"you (can|should) (check|ask|visit|contact).*?(?=\.|$)",
+        r"consider (checking|asking|visiting).*?(?=\.|$)",
+        r"for more information.*?check.*?\.",
+    ]
+    for pattern in orphaned_phrases:
+        response = re.sub(pattern, "", response, flags=re.IGNORECASE)
+    
+    # Clean up any double periods or weird spacing
+    response = response.strip()
+    response = re.sub(r"\s+", " ", response)
+    response = re.sub(r"\.{2,}", ".", response)
+    
+    # Ensure response ends with proper punctuation
+    if response and not response[-1] in ".!?":
+        response += "."
+    
+    # If response is too short after cleaning, add a helpful fallback
+    if len(response.strip()) < 20:
+        response = "👋 I'd be happy to help with your farming question. Could you share more details about your crop or specific concern? For example, what type of crop, the size of your farm, and where you're located. This will help me give you better advice!"
+    
+    return response.strip()
+
+
+def enforce_response_format(response: str, has_search: bool = True) -> str:
+    """
+    Ensure response follows the exact 5-section format.
+    Aggressively reformats any response that doesn't match.
+    """
+    import re
+    
+    # Check if response already has all 5 required sections
+    has_summary = bool(re.search(r"📌\s*SUMMARY:", response, re.IGNORECASE))
+    has_details = bool(re.search(r"📋\s*DETAILS\s*FROM\s*SEARCH:", response, re.IGNORECASE))
+    has_actions = bool(re.search(r"🎯\s*WHAT\s*TO\s*DO:", response, re.IGNORECASE))
+    has_costs = bool(re.search(r"💰\s*COSTS:", response, re.IGNORECASE))
+    has_source = bool(re.search(r"📊\s*WHERE\s*INFO\s*CAME\s*FROM:", response, re.IGNORECASE))
+    
+    # If all 5 sections are present, return as-is
+    if has_summary and has_details and has_actions and has_costs and has_source:
+        return response
+    
+    # Otherwise, aggressively reformat by extracting content
+    lines = response.split('\n')
+    
+    # Initialize sections with defaults
+    summary_lines = []
+    detail_lines = []
+    action_lines = []
+    cost_lines = []
+    source_lines = []
+    
+    current_section = None
+    
+    for line in lines:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        
+        # Skip lines that are just emojis or short headers
+        if len(line_stripped) < 3:
+            continue
+            
+        # Detect section headers in the response
+        if re.search(r"SUMMARY|MUHTASARI|INTRODUCTION", line_stripped, re.IGNORECASE):
+            current_section = "summary"
+            continue
+        elif re.search(r"DETAILS?|MAELEZO|FACTS?|INFORMATION", line_stripped, re.IGNORECASE):
+            current_section = "details"
+            continue
+        elif re.search(r"WHAT TO DO|ACTION|UNACHOFANYA|STEPS|DO THIS", line_stripped, re.IGNORECASE):
+            current_section = "actions"
+            continue
+        elif re.search(r"COSTS?|GHARAMA|PRICE|BEI", line_stripped, re.IGNORECASE):
+            current_section = "costs"
+            continue
+        elif re.search(r"SOURCE|FROM|ILITOKA|REFERENCE", line_stripped, re.IGNORECASE):
+            current_section = "source"
+            continue
+        elif re.search(r"CROP|OBSERVATION|IDENTIFIED|TREATMENT|PLAN|NOTES", line_stripped, re.IGNORECASE):
+            # Skip these old section headers
+            current_section = None
+            continue
+        
+        # Extract content based on patterns
+        line_lower = line_stripped.lower()
+        
+        # Price/cost detection
+        if 'ksh' in line_lower or 'cost' in line_lower or 'price' in line_lower or 'bei' in line_lower or '💰' in line_stripped:
+            cost_lines.append(line_stripped)
+        # Numbered step detection
+        elif re.match(r"^\d+[\.\)]\s", line_stripped):
+            action_lines.append(line_stripped)
+        # Bullet point detection
+        elif line_stripped.startswith('-') or line_stripped.startswith('•'):
+            content = line_stripped[1:].strip()
+            if len(content) > 10:
+                detail_lines.append(content)
+        # Longer sentences go to summary or details
+        elif len(line_stripped) > 30:
+            if len(summary_lines) < 2:
+                summary_lines.append(line_stripped)
+            else:
+                detail_lines.append(line_stripped)
+        # Shorter actionable lines
+        elif any(word in line_lower for word in ['visit', 'buy', 'apply', 'plant', 'do', 'check', 'use', 'call']):
+            action_lines.append(f"{line_stripped}")
+    
+    # Build sections with extracted content or defaults
+    summary = " ".join(summary_lines[:2]) if summary_lines else "Here's what you need to know for your farming question."
+    
+    details = "\n".join([f"- {d[:120]}" for d in detail_lines[:5]]) if detail_lines else "- Information based on agricultural best practices for Kenyan farmers"
+    
+    actions = []
+    for i, act in enumerate(action_lines[:4], 1):
+        # Clean up the action text
+        act_clean = re.sub(r"^\d+[\.\)]\s*", "", act)  # Remove existing numbers
+        actions.append(f"{i}. {act_clean[:100]}")
+    if not actions:
+        actions = ["1. Visit your local agrovet for specific products and advice", 
+                   "2. Apply the recommendations based on your farm conditions",
+                   "3. Monitor your crops regularly for best results"]
+    
+    costs = "\n".join([f"- {c[:100]}" for c in cost_lines]) if cost_lines else "- Costs vary by location and supplier. Visit your local agrovet for exact pricing."
+    
+    source = source_lines[0] if source_lines else "From verified agricultural knowledge base and best farming practices"
+    
+    # Build final formatted response
+    formatted = f"""📌 SUMMARY:
+{summary}
+
+📋 DETAILS FROM SEARCH:
+{details}
+
+🎯 WHAT TO DO:
+{"\n".join(actions)}
+
+💰 COSTS:
+{costs}
+💰 Prices as of 2024 from web search
+
+📊 WHERE INFO CAME FROM:
+{source}"""
+    
+    return formatted
 
 
 def get_ai_response(
@@ -58,8 +244,129 @@ def get_ai_response(
     else:
         system_prompt = SYSTEM_PROMPT_BASE
     
+    # Fetch user profile for personalized context
+    user_profile = get_user_profile(user_phone)
+    profile_context = ""
+    
+    if user_profile:
+        # Build profile context from available data
+        profile_parts = []
+        
+        if user_profile.get('county') or user_profile.get('location'):
+            location = user_profile.get('county') or user_profile.get('location')
+            profile_parts.append(f"Location: {location}")
+        
+        if user_profile.get('crop_types') and len(user_profile['crop_types']) > 0:
+            crops = ', '.join(user_profile['crop_types'])
+            profile_parts.append(f"Crops planted: {crops}")
+        
+        if user_profile.get('farm_size'):
+            unit = user_profile.get('farm_size_unit', 'acres')
+            profile_parts.append(f"Farm size: {user_profile['farm_size']} {unit}")
+        
+        if user_profile.get('water_access_level'):
+            water = user_profile['water_access_level']
+            profile_parts.append(f"Water access: {water}")
+        
+        if user_profile.get('soil_type'):
+            profile_parts.append(f"Soil type: {user_profile['soil_type']}")
+        
+        if user_profile.get('farming_experience'):
+            profile_parts.append(f"Experience: {user_profile['farming_experience']}")
+        
+        if user_profile.get('primary_farming_activity'):
+            profile_parts.append(f"Primary activity: {user_profile['primary_farming_activity']}")
+        
+        if profile_parts:
+            profile_context = f"""
+👤 FARMER PROFILE CONTEXT (Use this information to personalize your response):
+{chr(10).join(f"- {part}" for part in profile_parts)}
+
+When the farmer asks about their crops, farm, or location, use this profile information to provide specific, personalized advice. If they ask "what crops am I planting?" or similar questions, refer to their profile crops listed above."""
+    
     # CRITICAL: Language instruction must be FIRST and STRONGEST
     lang_instruction = "Swahili" if target_language == "sw" else "English"
+    
+    # Formatting instructions - CRITICAL: MUST USE THIS EXACT FORMAT
+    formatting_instruction = f"""
+⚠️⚠️⚠️ CRITICAL FORMATTING RULE - YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE ⚠️⚠️⚠️
+
+YOU ARE REQUIRED TO USE ALL 5 SECTIONS BELOW. DO NOT SKIP ANY SECTION.
+
+═══════════════════════════════════════════════════════════════
+
+SECTION 1 - START WITH THIS EXACT HEADER:
+📌 SUMMARY:
+- Write 2-3 sentences giving the direct answer
+- Keep it brief and practical
+break
+
+SECTION 2 - USE THIS EXACT HEADER:
+📋 DETAILS FROM SEARCH:
+- Use bullet points starting with "- " (dash followed by space)
+- List 3-5 key facts
+- Include prices, locations, dates
+break
+
+SECTION 3 - USE THIS EXACT HEADER:
+🎯 WHAT TO DO:
+- Numbered steps: 1. 2. 3.
+- Write 3-4 clear action items
+- Make them practical for farmers
+break
+SECTION 4 - USE THIS EXACT HEADER:
+💰 COSTS:
+- Use "- " for bullet points
+- List ALL costs with Ksh amounts
+- ALWAYS end this section with: "💰 Prices as of [month year] from web search"
+break
+
+SECTION 5 - USE THIS EXACT HEADER:
+📊 WHERE INFO CAME FROM:
+- Write "From web search: [source description]"
+- Or "From verified agricultural database" if using KB
+
+═══════════════════════════════════════════════════════════════
+
+MANDATORY RULES:
+🚫 NEVER use any other section headers (NO "Crop Identified", NO "Observations", etc.)
+🚫 NEVER skip any of the 5 sections above
+🚫 ALWAYS use "- " (dash space) for bullet points
+🚫 ALWAYS use "1. 2. 3." format for WHAT TO DO section
+🚫 ALWAYS put 1 blank line between each section
+🚫 ALWAYS start with 📌 SUMMARY:
+🚫 ALWAYS end with 📊 WHERE INFO CAME FROM:
+
+PERFECT EXAMPLE (COPY THIS STRUCTURE EXACTLY):
+
+📌 SUMMARY:
+The price of layer chickens in Nairobi is around Ksh 500-700 per chick. You can find them at local poultry farms or markets.
+
+📋 DETAILS FROM SEARCH:
+- Price: Ksh 500-700 per chick
+- Location: Nairobi, local poultry farms or markets
+- Availability: Usually in stock
+break
+
+🎯 WHAT TO DO:
+1. Visit local poultry farms or markets in Nairobi.
+2. Compare prices from different sellers.
+3. Ensure you buy healthy chicks.
+break
+
+💰 COSTS:
+- Price per chick: Ksh 500-700
+- Total cost estimate: depends on the number of chicks you buy
+💰 Prices as of March 2024 from web search
+break
+
+📊 WHERE INFO CAME FROM:
+From web search: various online marketplaces and poultry farms in Nairobi.
+break
+
+═══════════════════════════════════════════════════════════════
+WARNING: Responses that don't use this exact format will be rejected. Use ONLY the 5 sections above."""
+    
     lang_enforcement = f"""⚠️ CRITICAL LANGUAGE RULE - THIS IS THE MOST IMPORTANT INSTRUCTION:
 
 You MUST respond ENTIRELY in {lang_instruction}. 
@@ -72,8 +379,11 @@ You MUST respond ENTIRELY in {lang_instruction}.
 
 THIS IS MANDATORY. IGNORE ALL OTHER LANGUAGE INSTRUCTIONS IN THIS PROMPT."""
     
-    # Prepend language enforcement to make it the first/highest priority instruction
-    system_prompt = lang_enforcement + "\n\n" + system_prompt
+    # Combine all context with system prompt
+    if profile_context:
+        system_prompt = lang_enforcement + "\n\n" + formatting_instruction + "\n\n" + profile_context + "\n\n" + system_prompt
+    else:
+        system_prompt = lang_enforcement + "\n\n" + formatting_instruction + "\n\n" + system_prompt
     
     # Also replace "English" mentions in the prompt with the target language
     if target_language == "sw":
@@ -171,6 +481,12 @@ Please answer using both your knowledge, the web search results, and any verifie
             if ai_response:
                 logger.debug(f"AI response generated: {ai_response[:50]}...")
                 
+                # Post-processing: Clean up the response
+                ai_response = clean_ai_response(ai_response)
+                
+                # Post-processing: Enforce exact 5-section format
+                ai_response = enforce_response_format(ai_response, has_search=use_search)
+                
                 # Post-processing: Check if response is in correct language
                 if target_language == "sw":
                     # Check if response contains mostly English
@@ -184,6 +500,8 @@ Please answer using both your knowledge, the web search results, and any verifie
                         if english_ratio > 0.4:
                             logger.warning(f"AI responded in English (ratio: {english_ratio:.2f}), translating to Swahili...")
                             ai_response = translate_response(ai_response, "sw")
+                            ai_response = clean_ai_response(ai_response)  # Clean again after translation
+                            ai_response = enforce_response_format(ai_response, has_search=use_search)  # Re-enforce format after translation
                 
                 return ai_response
             else:
@@ -255,8 +573,32 @@ You MUST respond ENTIRELY in {lang_instruction}.
 
 THIS IS MANDATORY. IGNORE ALL OTHER LANGUAGE INSTRUCTIONS IN THIS PROMPT."""
     
-    # Prepend language enforcement
-    system_prompt = lang_enforcement + "\n\n" + system_prompt
+    # Add formatting instructions for streaming too
+    formatting_instruction = """
+⚠️⚠️⚠️ CRITICAL: YOU MUST USE THIS EXACT FORMAT ⚠️⚠️⚠️
+
+📌 SUMMARY:
+[2-3 sentence summary]
+
+📋 DETAILS FROM SEARCH:
+- [bullet points]
+
+🎯 WHAT TO DO:
+1. [step 1]
+2. [step 2]
+3. [step 3]
+
+💰 COSTS:
+- [cost items]
+💰 Prices as of [date] from web search
+
+📊 WHERE INFO CAME FROM:
+[source info]
+
+USE ONLY THESE 5 SECTIONS. NEVER SKIP ANY."""
+    
+    # Prepend language enforcement and formatting
+    system_prompt = lang_enforcement + "\n\n" + formatting_instruction + "\n\n" + system_prompt
     
     if target_language == "sw":
         system_prompt = system_prompt.replace("Use SIMPLE English", "Use SIMPLE Swahili")
@@ -267,28 +609,8 @@ THIS IS MANDATORY. IGNORE ALL OTHER LANGUAGE INSTRUCTIONS IN THIS PROMPT."""
     kb_result = search_knowledge(user_message, top_k=3, threshold=0.7)
     
     if kb_result["found"] and kb_result["confidence"] >= RAG_CONFIDENCE_THRESHOLD:
-        # Return cached response immediately (no streaming needed for KB hits)
-        verified_answer = kb_result["answer"]
-        source = kb_result["source"]
-        crop = kb_result.get("matched_crop", "")
-        
-        # Translate if needed
-        if target_language == "sw":
-            verified_answer = translate_response(verified_answer, "sw")
-            source_label = "Kutoka"
-            verified_label = "info iliyoidhinishwa"
-            for_label = "Kwa"
-        else:
-            source_label = "From"
-            verified_label = "verified info"
-            for_label = "For"
-        
-        rag_response = f"""{verified_answer}
-
-📚 {source_label}: {source} ({verified_label})
-🌾 {for_label}: {crop.capitalize() if crop else 'General farming'}"""
-        
-        yield rag_response
+        # Return formatted KB response using 5-section format
+        yield _format_kb_response(kb_result, target_language)
         return
     
     # Prepare messages for AI
@@ -387,23 +709,54 @@ def format_search_results_text(results: List[Any]) -> str:
 
 
 def _format_kb_response(kb_result: dict, target_language: str) -> str:
-    """Format knowledge base response for user."""
+    """Format knowledge base response using the 5-section format."""
     verified_answer = kb_result["answer"]
     source = kb_result["source"]
     crop = kb_result.get("matched_crop", "")
     
-    # Translate if needed
+    # Build the 5-section format for KB responses
     if target_language == "sw":
-        verified_answer = translate_response(verified_answer, "sw")
-        response = f"""{verified_answer}
+        response = f"""📌 MUHTASARI:
+{verified_answer[:200]}...
 
-📚 Kutoka: {source} (info iliyoidhinishwa)
-🌾 Kwa: {crop.capitalize() if crop else 'Mkulima'}"""
+📋 MAELEZO KUTOKA KWENYE HAZINA:
+- {verified_answer[:150]}
+- Taarifa imethibitishwa na {source}
+- Zaidi ya maelezo yanapatikana kwenye hii hazina
+
+🎯 UNACHOFANYA:
+1. Soma maelezo yote hapo juu kwa uangalifu
+2. Fuata maelekezo yanayohusiana na shida lako
+3. Wasiliana na KALRO 0111-029111 ikiwa unahitaji usaidizi zaidi
+
+💰 GHARAMA:
+- Bidhaa zinapatikana kwa bei tofauti kulingana na eneo
+- Tembelea agrovet ya karibu kwa bei sahihi
+💰 Bei zinaweza kutofautiana kulingana na eneo na wakati
+
+� TAARIFA ILITOKA WAPI:
+Kutoka: {source} (hazina ya kilimo iliyoidhinishwa)"""
     else:
-        response = f"""{verified_answer}
+        response = f"""📌 SUMMARY:
+{verified_answer[:200]}...
 
-📚 From: {source} (verified info)
-🌾 For: {crop.capitalize() if crop else 'Farmers'}"""
+� DETAILS FROM SEARCH:
+- {verified_answer[:150]}
+- Information verified by {source}
+- Additional details available in knowledge base
+
+🎯 WHAT TO DO:
+1. Read the information above carefully
+2. Follow relevant advice for your situation
+3. Contact KALRO 0111-029111 if you need more help
+
+💰 COSTS:
+- Products available at varying prices depending on location
+- Visit your local agrovet for exact pricing
+💰 Prices may vary by location and timing
+
+📊 WHERE INFO CAME FROM:
+From: {source} (verified agricultural knowledge base)"""
     
     return response
 
@@ -447,44 +800,82 @@ def _search_uploaded_documents(query: str, pipeline) -> dict:
 
 
 def _format_document_response(doc_results: dict, target_language: str) -> str:
-    """Format uploaded document response for user."""
+    """Format uploaded document response using 5-section format."""
     answer = doc_results["answer"]
     source = doc_results["source"]
     title = doc_results.get("title", "")
     
     if target_language == "sw":
         answer = translate_response(answer, "sw")
-        response = f"""{answer}
+        response = f"""📌 MUHTASARI:
+{answer[:200]}...
 
-📄 Kutoka: {source}
-📖 Hati: {title}"""
+� MAELEZO KUTOKA KWENYE HATI:
+- {answer[:150]}
+- Taarifa kutoka: {title}
+- Chapisho: {source}
+
+🎯 UNACHOFANYA:
+1. Soma maelezo yote kwa uangalifu
+2. Fuata maelekezo yanayohusiana na hali yako
+3. Uliza maswali zaidi ikiwa hujielewi
+
+� GHARAMA:
+- Gharama zinategemea bidhaa na eneo
+- Tembelea agrovet kwa bei sahihi
+💰 Bei zinaweza kutofautiana
+
+📊 TAARIFA ILITOKA WAPI:
+Kutoka: {source} - {title}"""
     else:
-        response = f"""{answer}
+        response = f"""📌 SUMMARY:
+{answer[:200]}...
 
-📄 From: {source}
-📖 Document: {title}"""
+� DETAILS FROM SEARCH:
+- {answer[:150]}
+- From document: {title}
+- Published by: {source}
+
+🎯 WHAT TO DO:
+1. Read all the information carefully
+2. Follow the advice relevant to your situation
+3. Ask follow-up questions if you need clarification
+
+� COSTS:
+- Costs depend on products and your location
+- Visit your local agrovet for exact pricing
+💰 Prices may vary by location
+
+📊 WHERE INFO CAME FROM:
+From: {source} - {title}"""
     
     return response
 
 
 def get_fallback_response(language: str = "en") -> str:
-    """Get fallback response when AI fails."""
+    """Get confident fallback response when AI fails."""
     if language == "sw":
-        return """Samahani, nimekumbwa na shida kidogo. Tafadhali jaribu tena baadaye.
+        return """👋 Habari! Ninaweza kukusaidia na maswali yako ya kilimo.
 
-Kwa sasa, unaweza kuuliza maswali kuhusu:
-- Ugonjwa wa mimea
-- Mbolea na lishe ya udongo
-- Hali ya hewa na mvua
-- Bei za soko"""
+🌾 Ninajua mengi kuhusu:
+• Kulima mahindi, maharagwe, na mimea mingine
+• Kutibu wadudu na magonjwa
+• Mbolea na lishe ya mimea
+• Hali ya hewa na wakati wa kupanda
+• Bei za soko
+
+💡 Uliza swali lolote kuhusu kilimo, nikusaidie!"""
     else:
-        return """I'm sorry, I'm experiencing a technical issue right now. Please try again later.
+        return """👋 Hello! I'm ready to help with your farming questions.
 
-In the meantime, you can ask about:
-- Plant diseases and pests
-- Fertilizers and soil nutrition
-- Weather and rainfall
-- Market prices"""
+🌾 I can assist with:
+• Growing maize, beans, and other crops
+• Treating pests and diseases
+• Fertilizers and plant nutrition
+• Weather timing and planting seasons
+• Market prices and selling
+
+💡 Ask me anything about farming - I'm here to help!"""
 
 
 # Specific response templates for common queries

@@ -694,3 +694,54 @@ export const sendChatMessageAuth = async (message, context = '') => {
     };
   }
 };
+
+// ============ Profile API ============
+
+/**
+ * Get farmer profile
+ */
+export const getProfile = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Get Profile Error:', error);
+    return { success: false, detail: 'Failed to fetch profile' };
+  }
+};
+
+/**
+ * Update farmer profile
+ */
+export const updateProfile = async (profileData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(profileData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Update Profile Error:', error);
+    return { success: false, detail: 'Failed to update profile' };
+  }
+};
+
+// Profile API object for cleaner imports
+export const profileAPI = {
+  getProfile,
+  updateProfile,
+};

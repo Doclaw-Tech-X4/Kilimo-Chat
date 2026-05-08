@@ -105,7 +105,10 @@ const HomePage = () => {
             </div>
             <span className="text-small font-semibold text-[#0f7e39]">KilimoChat</span>
           </div>
-          <div className="h-6 w-6 rounded-full border border-[#cbcbcb] text-[#7d7d7d] flex items-center justify-center text-xs hover:bg-[#0f7e39] hover:text-white hover:border-[#0f7e39] transition-all duration-300 cursor-pointer">
+          <div 
+            onClick={() => navigate('/profile')}
+            className="h-6 w-6 rounded-full border border-[#cbcbcb] text-[#7d7d7d] flex items-center justify-center text-xs hover:bg-[#0f7e39] hover:text-white hover:border-[#0f7e39] transition-all duration-300 cursor-pointer"
+          >
             👤
           </div>
         </header>
@@ -297,15 +300,16 @@ const HomePage = () => {
               <p className="mt-1 text-body text-white/90">
                 Join over 50,000 farmers using KilimoChat to grow better
               </p>
-              <button
-                type="button"
-                onClick={() => navigate('/expertchat')}
+              <a
+                href="https://wa.me/+14155238886?text=join%20why-accident"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group mx-auto mt-4 flex w-full max-w-[330px] items-center justify-center gap-2 rounded-full bg-white py-3 text-title font-semibold text-[#0f7e39] shadow-lg hover:shadow-xl hover:scale-105 hover:bg-[#f0f0f0] transition-all duration-300"
               >
                 <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                Start Chatting Now
+                Chat WhatsApp
                 <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </a>
             </div>
           </section>
         </main>
