@@ -6,7 +6,6 @@ import {
   Camera, 
   Mic, 
   Tractor, 
-  Settings, 
   Send,
   Play,
   Pause,
@@ -51,7 +50,6 @@ const ExpertChatPage = () => {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingCancelled, setRecordingCancelled] = useState(false);
   const messagesEndRef = useRef(null);
-  const audioRef = useRef(new Audio());
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
@@ -245,10 +243,12 @@ const ExpertChatPage = () => {
               if (data.type === 'metadata') {
                 detectedLang = data.language || 'en';
                 // Update message with detected language
+                const currentLang = detectedLang;
+                const currentBotId = botMessageId;
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === botMessageId
-                      ? { ...msg, detectedLanguage: detectedLang }
+                    msg.id === currentBotId
+                      ? { ...msg, detectedLanguage: currentLang }
                       : msg
                   )
                 );
@@ -258,10 +258,12 @@ const ExpertChatPage = () => {
                 sentenceBuffer += textChunk;
 
                 // Update the message text
+                const currentResponse = fullResponse;
+                const currentBotId = botMessageId;
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === botMessageId
-                      ? { ...msg, text: fullResponse }
+                    msg.id === currentBotId
+                      ? { ...msg, text: currentResponse }
                       : msg
                   )
                 );
@@ -277,7 +279,8 @@ const ExpertChatPage = () => {
                     
                     if (!isSpeaking && completeSentences.trim().length > 10) {
                       isSpeaking = true;
-                      speakStreamingChunk(completeSentences.trim(), detectedLang, () => {
+                      const currentDetectedLang = detectedLang;
+                      speakStreamingChunk(completeSentences.trim(), currentDetectedLang, () => {
                         isSpeaking = false;
                       });
                     }
@@ -286,13 +289,15 @@ const ExpertChatPage = () => {
               } else if (data.type === 'done') {
                 // Stream complete - speak any remaining text
                 if (sentenceBuffer.trim().length > 5 && !isSpeaking) {
-                  speakStreamingChunk(sentenceBuffer.trim(), detectedLang);
+                  const currentDetectedLang = detectedLang;
+                  speakStreamingChunk(sentenceBuffer.trim(), currentDetectedLang);
                 }
                 
                 // Mark message as complete
+                const currentBotId = botMessageId;
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === botMessageId
+                    msg.id === currentBotId
                       ? { ...msg, isStreaming: false }
                       : msg
                   )

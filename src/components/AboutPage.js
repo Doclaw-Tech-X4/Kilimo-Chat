@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScanSearch, Mic, Sun, ShoppingBag, Sprout, ArrowLeft, MessageCircle, HelpCircle, Sparkles, Zap, Shield, Globe, Heart, Award, Leaf } from 'lucide-react';
+import { ScanSearch, Mic, Sun, ShoppingBag, Sprout, ArrowLeft, Sparkles, Zap, Shield, Globe, Heart, Award, Leaf } from 'lucide-react';
 import DockNavigation from './DockNavigation';
 
 const AboutPage = () => {
