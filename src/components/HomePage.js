@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Sprout, ScanLine, BadgeCheck, Repeat2, ChevronRight, Sparkles } from 'lucide-react';
+import { Sprout, ScanLine, BadgeCheck, Repeat2, Mic, Sun, ShoppingBag, MessageCircle, ChevronRight, Sparkles } from 'lucide-react';
 import DockNavigation from './DockNavigation';
 
 const HomePage = () => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Cloud, Sun, CloudRain, Wind, Droplets, 
   MapPin, Sprout, Clock, ChevronRight, 
+  CloudLightning, CloudSnow, Eye, Calendar,
   ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

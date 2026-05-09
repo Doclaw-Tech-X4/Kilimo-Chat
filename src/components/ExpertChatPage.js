@@ -56,6 +56,7 @@ const ExpertChatPage = () => {
   const timerRef = useRef(null);
   const startYRef = useRef(null);
   const startTimeRef = useRef(null);
+  const isSpeakingRef = useRef(false);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -195,7 +196,6 @@ const ExpertChatPage = () => {
     let fullResponse = '';
     let detectedLang = 'en';
     let sentenceBuffer = '';
-    const isSpeakingRef = useRef(false);
 
     try {
       // Create initial bot message
