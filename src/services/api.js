@@ -670,7 +670,6 @@ export const uploadFileAuth = async (file, context = '') => {
  */
 export const sendChatMessageAuth = async (message, context = '') => {
   try {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: getAuthHeaders(),

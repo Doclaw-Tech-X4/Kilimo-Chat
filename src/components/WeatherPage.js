@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Cloud, Sun, CloudRain, Wind, Droplets, Thermometer, 
-  MapPin, Sprout, Calendar, Clock, ChevronRight, 
-  Home, MessageCircle, HelpCircle, Mic, ShoppingBag,
-  CloudLightning, CloudSnow, Eye, ArrowLeft
+  Cloud, Sun, CloudRain, Wind, Droplets, 
+  MapPin, Sprout, Clock, ChevronRight, 
+  ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserLocation, getWeatherForLocation, getWeatherByName } from '../services/api';

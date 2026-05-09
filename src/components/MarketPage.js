@@ -12,11 +12,7 @@ import {
   Loader2,
   X,
   BarChart3,
-  Calendar,
-  DollarSign,
   Navigation,
-  Globe,
-  MessageCircle,
   Volume2
 } from 'lucide-react';
 import DockNavigation from './DockNavigation';

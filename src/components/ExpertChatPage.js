@@ -195,7 +195,7 @@ const ExpertChatPage = () => {
     let fullResponse = '';
     let detectedLang = 'en';
     let sentenceBuffer = '';
-    let isSpeaking = false;
+    const isSpeakingRef = useRef(false);
 
     try {
       // Create initial bot message
@@ -277,18 +277,18 @@ const ExpertChatPage = () => {
                     const completeSentences = sentences.slice(0, -1).join('. ') + '.';
                     sentenceBuffer = sentences[sentences.length - 1];
                     
-                    if (!isSpeaking && completeSentences.trim().length > 10) {
-                      isSpeaking = true;
+                    if (!isSpeakingRef.current && completeSentences.trim().length > 10) {
+                      isSpeakingRef.current = true;
                       const currentDetectedLang = detectedLang;
                       speakStreamingChunk(completeSentences.trim(), currentDetectedLang, () => {
-                        isSpeaking = false;
+                        isSpeakingRef.current = false;
                       });
                     }
                   }
                 }
               } else if (data.type === 'done') {
                 // Stream complete - speak any remaining text
-                if (sentenceBuffer.trim().length > 5 && !isSpeaking) {
+                if (sentenceBuffer.trim().length > 5 && !isSpeakingRef.current) {
                   const currentDetectedLang = detectedLang;
                   speakStreamingChunk(sentenceBuffer.trim(), currentDetectedLang);
                 }
