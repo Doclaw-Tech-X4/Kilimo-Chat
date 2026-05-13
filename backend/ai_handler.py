@@ -248,6 +248,64 @@ _where info came from_:
     return formatted
 
 
+def finalize_chat_response_text(
+    raw: str,
+    *,
+    user_message: str = "",
+    target_language: str = "en",
+    use_search: bool = True,
+) -> str:
+    """
+    Normalize model output for chat surfaces (web + WhatsApp): structure,
+    optional Swahili pass, then polish. Skips aggressive restructure when the
+    body already looks like a formatted KB / document reply (*SECTION* headers).
+    """
+    if not raw or not str(raw).strip():
+        return get_fallback_response(target_language)
+
+    ai_response = clean_ai_response(raw)
+    pre_formatted = bool(
+        re.search(
+            r"\*(SUMMARY|MUHTASARI|DETAILS|MAELEZO|NEXT STEPS|HATUA)\*",
+            ai_response,
+            re.IGNORECASE,
+        )
+    )
+    if not pre_formatted:
+        ai_response = enforce_response_format(ai_response, has_search=use_search)
+        if target_language == "sw":
+            english_words = [
+                "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+                "do", "does", "did", "will", "would", "could", "should", "may", "might", "must",
+                "shall", "can", "need", "dare", "ought", "used", "to", "of", "in", "for", "on",
+                "with", "at", "by", "from", "as", "into", "through", "during", "before", "after",
+                "above", "below", "between", "under", "again", "further", "then", "once", "here",
+                "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more",
+                "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so",
+                "than", "too", "very", "just", "now", "summary", "details", "what", "where", "cost",
+                "price", "information", "came", "from", "search", "web",
+            ]
+            words = ai_response.lower().split()
+            if len(words) > 5:
+                english_count = sum(
+                    1 for word in words if word.strip('.,!?;:"()[]{}') in english_words
+                )
+                english_ratio = english_count / len(words)
+                if english_ratio > 0.4:
+                    logger.warning(
+                        "Streaming/finalize: translating English-heavy reply to Swahili "
+                        "(ratio: %.2f)",
+                        english_ratio,
+                    )
+                    ai_response = translate_response(ai_response, "sw")
+                    ai_response = clean_ai_response(ai_response)
+                    ai_response = enforce_response_format(
+                        ai_response, has_search=use_search
+                    )
+
+    return polish_whatsapp_message(ai_response, target_language)
+
+
 def get_ai_response(
     user_message: str,
     user_phone: str,
@@ -501,30 +559,12 @@ Please answer using both your knowledge, the web search results, and any verifie
             
             if ai_response:
                 logger.debug(f"AI response generated: {ai_response[:50]}...")
-                
-                # Post-processing: Clean up the response
-                ai_response = clean_ai_response(ai_response)
-                
-                # Post-processing: Enforce exact 5-section format
-                ai_response = enforce_response_format(ai_response, has_search=use_search)
-                
-                # Post-processing: Check if response is in correct language
-                if target_language == "sw":
-                    # Check if response contains mostly English
-                    english_words = ['the', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now', 'summary', 'details', 'what', 'where', 'cost', 'price', 'information', 'came', 'from', 'search', 'web']
-                    words = ai_response.lower().split()
-                    if len(words) > 5:  # Only check if response is long enough
-                        english_count = sum(1 for word in words if word.strip('.,!?;:"()[]{}') in english_words)
-                        english_ratio = english_count / len(words)
-                        
-                        # If more than 40% English words, translate the response
-                        if english_ratio > 0.4:
-                            logger.warning(f"AI responded in English (ratio: {english_ratio:.2f}), translating to Swahili...")
-                            ai_response = translate_response(ai_response, "sw")
-                            ai_response = clean_ai_response(ai_response)  # Clean again after translation
-                            ai_response = enforce_response_format(ai_response, has_search=use_search)  # Re-enforce format after translation
-                
-                return polish_whatsapp_message(ai_response, target_language)
+                return finalize_chat_response_text(
+                    ai_response,
+                    user_message=user_message,
+                    target_language=target_language,
+                    use_search=use_search,
+                )
             else:
                 logger.warning("AI returned empty response")
                 
@@ -630,8 +670,12 @@ USE ONLY THESE 5 SECTIONS. NEVER SKIP ANY."""
     kb_result = search_knowledge(user_message, top_k=3, threshold=0.7)
     
     if kb_result["found"] and kb_result["confidence"] >= RAG_CONFIDENCE_THRESHOLD:
-        # Return formatted KB response using new WhatsApp-friendly format
-        yield format_response("", user_message, target_language)
+        logger.info(
+            "KB match for streaming (confidence: %.2f): %s",
+            kb_result["confidence"],
+            user_message[:50],
+        )
+        yield _format_kb_response(kb_result, target_language)
         return
     
     # Prepare messages for AI
@@ -688,23 +732,13 @@ Please answer using both your knowledge, the web search results, and any verifie
             stream=True,  # Enable streaming
         )
         
-        full_response = ""
         for chunk in response:
             if chunk.choices[0].delta.content:
                 text_chunk = chunk.choices[0].delta.content
-                full_response += text_chunk
                 yield text_chunk
-        
-        # Post-processing: Apply new WhatsApp-friendly format
-        if full_response:
-            formatted = format_response(full_response, user_message, target_language)
-            yield formatted
-        else:
-            yield get_fallback_response(target_language)
-        
+
     except Exception as e:
         logger.error(f"Streaming AI request failed: {e}")
-        # Yield fallback response
         yield get_fallback_response(target_language)
 
 

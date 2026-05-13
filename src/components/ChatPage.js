@@ -347,16 +347,19 @@ const ChatPage = () => {
                   }
                 }
               } else if (data.type === 'done') {
-                // Stream complete - speak any remaining text
+                // Stream complete — replace with server-finalized formatted text
+                const displayText =
+                  (typeof data.full_text === 'string' && data.full_text.trim()
+                    ? data.full_text
+                    : fullResponse) || fullResponse;
                 if (sentenceBuffer.trim().length > 5 && !isSpeaking) {
                   speakStreamingChunk(sentenceBuffer.trim(), detectedLang);
                 }
-                
-                // Mark message as complete
+
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === botMessageId
-                      ? { ...msg, isStreaming: false }
+                      ? { ...msg, text: displayText, isStreaming: false }
                       : msg
                   )
                 );
@@ -812,7 +815,7 @@ const ChatPage = () => {
                       <BriefcaseMedical className="h-4 w-4" />
                     </div>
                     <div className="max-w-[290px] rounded-2xl rounded-tl-sm bg-white px-3 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.08)]">
-                      <p className="text-chat-message text-[#232323] whitespace-pre-line">
+                      <p className="text-chat-message text-[#232323] whitespace-pre-line leading-relaxed">
                         {msg.text}
                       </p>
                       {/* Audio play button for bot responses - manual trigger only */}

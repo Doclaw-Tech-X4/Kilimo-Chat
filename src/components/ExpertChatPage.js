@@ -287,18 +287,18 @@ const ExpertChatPage = () => {
                   }
                 }
               } else if (data.type === 'done') {
-                // Stream complete - speak any remaining text
+                const displayText =
+                  (typeof data.full_text === 'string' && data.full_text.trim()
+                    ? data.full_text
+                    : fullResponse) || fullResponse;
                 if (sentenceBuffer.trim().length > 5 && !isSpeakingRef.current) {
-                  const currentDetectedLang = detectedLang;
-                  speakStreamingChunk(sentenceBuffer.trim(), currentDetectedLang);
+                  speakStreamingChunk(sentenceBuffer.trim(), detectedLang);
                 }
-                
-                // Mark message as complete
-                const currentBotId = botMessageId;
+
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === currentBotId
-                      ? { ...msg, isStreaming: false }
+                    msg.id === botMessageId
+                      ? { ...msg, text: displayText, isStreaming: false }
                       : msg
                   )
                 );
@@ -764,7 +764,9 @@ const ExpertChatPage = () => {
                       <Tractor className="h-4 w-4" />
                     </div>
                     <div className="max-w-[305px] rounded-2xl rounded-tl-sm bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.08)]">
-                      <p className="text-chat-message text-[#232323]">{msg.text}</p>
+                      <p className="text-chat-message text-[#232323] whitespace-pre-line leading-relaxed">
+                        {msg.text}
+                      </p>
                       {/* Audio play button for bot responses - manual trigger only */}
                       <button
                         onClick={() => toggleAudio(msg.text, playingAudio === msg.id, msg.detectedLanguage || 'en', msg.id)}

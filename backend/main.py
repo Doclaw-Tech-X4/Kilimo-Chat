@@ -732,8 +732,8 @@ async def api_chat(request: Request):
             target_language=user.preferred_language,
             use_search=True
         )
-        
-        # Save to database
+        ai_response = validate_response_language(ai_response, user.preferred_language)
+        ai_response = polish_whatsapp_message(ai_response, user.preferred_language)
         save_message(
             user_phone=user_id,
             message_type="api",
@@ -829,12 +829,10 @@ async def chat_message_stream(request: Request):
         
         # Generate streaming response
         async def generate_stream():
-            from ai_handler import get_ai_response_streaming
-            
-            # Yield metadata first
+            from ai_handler import get_ai_response_streaming, finalize_chat_response_text
+
             yield f"data: {json.dumps({'type': 'metadata', 'language': detected_language})}\n\n"
-            
-            # Stream AI response chunks
+
             full_text = ""
             for chunk in get_ai_response_streaming(
                 user_message=message,
@@ -844,9 +842,14 @@ async def chat_message_stream(request: Request):
             ):
                 full_text += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
-            
-            # Yield completion with full text
-            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'language': detected_language})}\n\n"
+
+            polished = finalize_chat_response_text(
+                full_text,
+                user_message=message,
+                target_language=detected_language,
+                use_search=True,
+            )
+            yield f"data: {json.dumps({'type': 'done', 'full_text': polished, 'language': detected_language})}\n\n"
         
         return StreamingResponse(
             generate_stream(),
@@ -1481,8 +1484,8 @@ async def chat_message(request: Request):
             target_language=language,
             use_search=True
         )
-        
-        # Add AI response to history
+        ai_response = validate_response_language(ai_response, language)
+        ai_response = polish_whatsapp_message(ai_response, language)
         conversation_history[user_id].append({
             "role": "assistant",
             "content": ai_response,
