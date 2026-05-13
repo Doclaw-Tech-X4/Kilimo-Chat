@@ -25,7 +25,7 @@ from knowledge_base import search_knowledge, get_kb_stats
 from document_ingestion import get_ingestion_pipeline
 from language_utils import translate_response
 from database_auth import get_user_profile
-from response_formatter import format_response
+from response_formatter import format_response, polish_whatsapp_message
 
 # RAG threshold - minimum confidence to use knowledge base answer
 RAG_CONFIDENCE_THRESHOLD = 0.75
@@ -68,12 +68,12 @@ def clean_ai_response(response: str) -> str:
     # Remove these patterns and the following text up to the next sentence
     for pattern in uncertainty_patterns:
         response = re.sub(pattern, "", response, flags=re.IGNORECASE)
-    
-    # Clean up empty statements and double spaces
-    response = re.sub(r"\s+", " ", response)
+
+    # Normalize newlines; preserve paragraph structure (do NOT collapse newlines)
+    response = response.replace("\r\n", "\n").replace("\r", "\n")
     response = re.sub(r"\.{3,}", "", response)
     response = re.sub(r",\s*\.", ".", response)
-    
+
     # Remove orphaned references to checking other sources
     orphaned_phrases = [
         r"you (can|should) (check|ask|visit|contact).*?(?=\.|$)",
@@ -82,20 +82,32 @@ def clean_ai_response(response: str) -> str:
     ]
     for pattern in orphaned_phrases:
         response = re.sub(pattern, "", response, flags=re.IGNORECASE)
-    
-    # Clean up any double periods or weird spacing
-    response = response.strip()
-    response = re.sub(r"\s+", " ", response)
+
+    cleaned_lines: List[str] = []
+    for raw_line in response.split("\n"):
+        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        if line:
+            cleaned_lines.append(line)
+        elif cleaned_lines and cleaned_lines[-1] != "":
+            cleaned_lines.append("")
+    while cleaned_lines and cleaned_lines[-1] == "":
+        cleaned_lines.pop()
+    response = "\n".join(cleaned_lines)
     response = re.sub(r"\.{2,}", ".", response)
-    
-    # Ensure response ends with proper punctuation
-    if response and not response[-1] in ".!?":
-        response += "."
-    
+
+    # Punctuation: only enforce on short single-line blurbs (avoid trailing '.' on structured replies)
+    if response and "\n" not in response and len(response) < 400:
+        if response[-1] not in ".!?":
+            response += "."
+
     # If response is too short after cleaning, add a helpful fallback
     if len(response.strip()) < 20:
-        response = "I'd be happy to help with your farming question. Could you share more details about your crop or specific concern? For example, what type of crop, the size of your farm, and where you're located. This will help me give you better advice!"
-    
+        response = (
+            "I'd be happy to help with your farming question. Could you share more details "
+            "about your crop or specific concern? For example, what type of crop, the size of "
+            "your farm, and where you're located. This will help me give you better advice!"
+        )
+
     return response.strip()
 
 
@@ -116,11 +128,11 @@ def enforce_response_format(response: str, has_search: bool = True) -> str:
             return "Hello! I'm here to help with your farming questions. What would you like to know about crops, diseases, weather, or market prices?"
     
     # Check if response already has all 5 required sections (uppercase underlined headings with spacing)
-    has_summary = bool(re.search(r"(?i)_summary_:\s*\n", response))
-    has_details = bool(re.search(r"(?i)_details from search_:\s*\n", response))
-    has_actions = bool(re.search(r"(?i)_what to do_:\s*\n", response))
-    has_costs = bool(re.search(r"(?i)_costs_:\s*\n", response))
-    has_source = bool(re.search(r"(?i)_where info came from_:\s*\n", response))
+    has_summary = bool(re.search(r"(?i)_summary_\s*:", response))
+    has_details = bool(re.search(r"(?i)_details from search_\s*:", response))
+    has_actions = bool(re.search(r"(?i)_what to do_\s*:", response))
+    has_costs = bool(re.search(r"(?i)_costs_\s*:", response))
+    has_source = bool(re.search(r"(?i)_where info came from_\s*:", response))
     
     # If all 5 sections are present, return as-is
     if has_summary and has_details and has_actions and has_costs and has_source:
@@ -512,7 +524,7 @@ Please answer using both your knowledge, the web search results, and any verifie
                             ai_response = clean_ai_response(ai_response)  # Clean again after translation
                             ai_response = enforce_response_format(ai_response, has_search=use_search)  # Re-enforce format after translation
                 
-                return ai_response
+                return polish_whatsapp_message(ai_response, target_language)
             else:
                 logger.warning("AI returned empty response")
                 

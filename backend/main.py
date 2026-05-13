@@ -75,6 +75,7 @@ from search_handler import search_and_get_context
 from ai_handler import get_ai_response, check_quick_response, get_ai_response_streaming
 from voice_handler import process_voice_message, cleanup_old_voice_files as cleanup_voice
 from utils.messaging import send_long_whatsapp_message
+from response_formatter import polish_whatsapp_message
 
 # Import Gemini handler for image/video analysis
 try:
@@ -560,6 +561,12 @@ async def process_whatsapp_message(
         else:
             # Text message
             ai_response = await process_text_message(from_number, body)
+
+        try:
+            wa_lang = get_user_language(from_number)
+        except Exception:
+            wa_lang = "en"
+        ai_response = polish_whatsapp_message(str(ai_response), wa_lang)
 
         if not (ai_response and str(ai_response).strip()):
             ai_response = (

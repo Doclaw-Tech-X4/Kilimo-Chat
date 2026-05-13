@@ -4,7 +4,97 @@ Transforms raw AI output into beautiful WhatsApp-friendly messages for Kenyan fa
 """
 
 import re
+from typing import List
+
 from user_experience_improvements import get_ux_enhancer
+
+
+def polish_whatsapp_message(text: str, lang: str = "en") -> str:
+    """
+    Present bot replies in a clear, professional layout suited to WhatsApp.
+
+    - Preserves paragraph breaks while removing trailing clutter
+    - Converts common markdown (``**bold**``) to WhatsApp ``*bold*``
+    - Turns section markers into short *bold* headings for scanability
+    - Normalizes numbered lists (``1.item`` → ``1. item``)
+
+    Args:
+        text: Raw or partially formatted assistant text.
+        lang: BCP-47 style language hint (``en`` / ``sw``); reserved for future tweaks.
+
+    Returns:
+        WhatsApp-ready string (may still be chunked upstream for Twilio limits).
+    """
+    del lang  # Reserved for localized labels if we diverge further by language.
+    if not text or not str(text).strip():
+        return ""
+
+    t = str(text).replace("\r\n", "\n").replace("\r", "\n")
+
+    # Markdown → WhatsApp formatting (minimal, safe transforms)
+    t = re.sub(r"\*\*([^*]+)\*\*", r"*\1*", t)
+    t = re.sub(r"__([^_]+)__", r"_\1_", t)
+
+    # Underscore section headers from model prompts → bold labels
+    _section_pairs: List[tuple[str, str]] = [
+        (r"(?im)^_summary_\s*:\s*$", "*SUMMARY*"),
+        (r"(?im)^_details from search_\s*:\s*$", "*DETAILS*"),
+        (r"(?im)^_what to do_\s*:\s*$", "*NEXT STEPS*"),
+        (r"(?im)^_costs_\s*:\s*$", "*COSTS*"),
+        (r"(?im)^_where info came from_\s*:\s*$", "*SOURCE*"),
+        (r"(?im)^_muhtasari_\s*:\s*$", "*MUHTASARI*"),
+        (r"(?im)^_maelezo kutoka kwenye hazina_\s*:\s*$", "*MAELEZO*"),
+        (r"(?im)^_maelezo kutoka kwenye hati_\s*:\s*$", "*MAELEZO*"),
+        (r"(?im)^_maelezo_\s*:\s*$", "*MAELEZO*"),
+        (r"(?im)^_unachofanya_\s*:\s*$", "*HATUA*"),
+        (r"(?im)^_gharama_\s*:\s*$", "*GHARAMA*"),
+        (r"(?im)^_taarifa ilitoka wapi_\s*:\s*$", "*CHANZO*"),
+    ]
+    for pattern, repl in _section_pairs:
+        t = re.sub(pattern, repl, t)
+
+    # Legacy bracket headings from this module → bold
+    t = re.sub(
+        r"^\[(SUMMARY|DETAILS|WHAT TO DO|COSTS|SOURCE|MUHTASARI|MAELEZO|"
+        r"UNACHOFANYA|GHARAMA|CHANZO)\]\s*$",
+        lambda m: f"*{m.group(1)}*",
+        t,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
+
+    # "1.Item" → "1. Item" for numbered lists
+    t = re.sub(r"^(\d+)\.(?=\S)", r"\1. ", t, flags=re.MULTILINE)
+
+    lines = [ln.rstrip() for ln in t.split("\n")]
+    out: List[str] = []
+    prev_blank = False
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            if not prev_blank:
+                out.append("")
+            prev_blank = True
+            continue
+        prev_blank = False
+        out.append(s)
+
+    while out and out[-1] == "":
+        out.pop()
+    while out and out[0] == "":
+        out.pop(0)
+
+    return "\n".join(out).strip()
+
+
+def _truncate_preserving_paragraphs(text: str, max_chars: int) -> str:
+    """Trim long text without collapsing newlines into a single line."""
+    if len(text) <= max_chars:
+        return text
+    cut = text[: max_chars - 3].rstrip()
+    last_break = cut.rfind("\n\n")
+    if last_break > max_chars // 2:
+        return cut[:last_break].rstrip() + "\n\n…"
+    return cut.rstrip() + "…"
 
 
 def format_response(raw_response: str, user_message: str, lang: str) -> str:
@@ -30,7 +120,10 @@ def format_response(raw_response: str, user_message: str, lang: str) -> str:
     
     for pattern in greeting_patterns:
         if re.match(pattern, user_message.strip().lower()):
-            return ux_enhancer.format_success_message("Welcome message sent", lang)
+            return polish_whatsapp_message(
+                ux_enhancer.format_success_message("Welcome message sent", lang),
+                lang,
+            )
     
     # For non-greeting messages, format agricultural response
     formatted_response = _format_agricultural_response(raw_response, lang)
@@ -45,8 +138,8 @@ def format_response(raw_response: str, user_message: str, lang: str) -> str:
         formatted_response = ux_enhancer.add_contextual_help(formatted_response, "disease", lang)
     elif any(word in user_message.lower() for word in ['weather', 'hewa', 'mvua', 'rain']):
         formatted_response = ux_enhancer.add_contextual_help(formatted_response, "weather", lang)
-    
-    return formatted_response
+
+    return polish_whatsapp_message(formatted_response, lang)
 
 
 def _format_greeting(lang: str) -> str:
@@ -136,122 +229,75 @@ def _extract_sections(text: str) -> dict:
 
 
 def _build_english_response(sections: dict) -> str:
-    """Build English response with professional headers and proper section spacing."""
-    response_sections = []
-    
-    # Add warm acknowledgment
-    response_sections.append("I understand your question. Here's what I found:")
-    
+    """Build English response with clear section spacing and bold-style headings."""
+    response_sections: List[str] = []
+
+    response_sections.append(
+        "Below is a structured answer you can skim or read in full."
+    )
+
     # Summary section
     if sections['summary']:
-        # Convert numbered lists to bullet points
         summary = re.sub(r'^\d+\.\s*', '• ', sections['summary'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[SUMMARY]
-{summary}""")
-    
+        response_sections.append(f"\n*SUMMARY*\n{summary.strip()}")
+
     # Details section
     if sections['details']:
-        # Convert numbered lists to bullet points
         details = re.sub(r'^\d+\.\s*', '• ', sections['details'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[DETAILS]
-{details}""")
-    
+        response_sections.append(f"\n*DETAILS*\n{details.strip()}")
+
     # Actions section
     if sections['actions']:
-        # Convert numbered lists to bullet points
         actions = re.sub(r'^\d+\.\s*', '• ', sections['actions'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[WHAT TO DO]
-{actions}""")
-    
+        response_sections.append(f"\n*NEXT STEPS*\n{actions.strip()}")
+
     # Costs section
     if sections['costs']:
-        # Convert numbered lists to bullet points
         costs = re.sub(r'^\d+\.\s*', '• ', sections['costs'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[COSTS]
-{costs}""")
-    
+        response_sections.append(f"\n*COSTS*\n{costs.strip()}")
+
     # Source section
     if sections['source']:
-        response_sections.append(f"""
-[SOURCE]
-{sections['source']}""")
-    
-    # Add engaging question
-    response_sections.append("""
+        response_sections.append(f"\n*SOURCE*\n{sections['source'].strip()}")
 
-Did this help? What else would you like to know?""")
-    
-    # Join all sections with proper spacing
-    full_response = '\n'.join(response_sections)
-    
-    # Truncate to ~150 words if too long
-    words = full_response.split()
-    if len(words) > 150:
-        full_response = ' '.join(words[:147]) + '...'
-    
-    return full_response
+    response_sections.append(
+        "\n_Reply with a follow-up if you want more detail on any section._"
+    )
+
+    full_response = "\n".join(response_sections).strip()
+    return _truncate_preserving_paragraphs(full_response, 4200)
 
 
 def _build_swahili_response(sections: dict) -> str:
-    """Build Swahili response with professional headers and proper section spacing."""
-    response_sections = []
-    
-    # Add warm acknowledgment
-    response_sections.append("Nimekuelewa swali lako. Hii ndiyo niliyopata:")
-    
-    # Summary section
-    if sections['summary']:
-        # Convert numbered lists to bullet points
-        summary = re.sub(r'^\d+\.\s*', '• ', sections['summary'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[MUHTASARI]
-{summary}""")
-    
-    # Details section
-    if sections['details']:
-        # Convert numbered lists to bullet points
-        details = re.sub(r'^\d+\.\s*', '• ', sections['details'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[MAELEZO]
-{details}""")
-    
-    # Actions section
-    if sections['actions']:
-        # Convert numbered lists to bullet points
-        actions = re.sub(r'^\d+\.\s*', '• ', sections['actions'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[UNACHOFANYA]
-{actions}""")
-    
-    # Costs section
-    if sections['costs']:
-        # Convert numbered lists to bullet points
-        costs = re.sub(r'^\d+\.\s*', '• ', sections['costs'], flags=re.MULTILINE)
-        response_sections.append(f"""
-[GHARAMA]
-{costs}""")
-    
-    # Source section
-    if sections['source']:
-        response_sections.append(f"""
-[CHANZO]
-{sections['source']}""")
-    
-    # Add engaging question
-    response_sections.append("""
+    """Build Swahili response with clear section spacing."""
+    response_sections: List[str] = []
 
-Hii ilikusaidia? Unataka kujua nini zaidi?""")
-    
-    # Join all sections with proper spacing
-    full_response = '\n'.join(response_sections)
-    
-    # Truncate to ~100 words if too long (Swahili is more concise)
-    words = full_response.split()
-    if len(words) > 100:
-        full_response = ' '.join(words[:97]) + '...'
-    
-    return full_response
+    response_sections.append(
+        "Hapa kuna jibu lililopangwa kwa urahisi wa kusoma."
+    )
+
+    if sections['summary']:
+        summary = re.sub(r'^\d+\.\s*', '• ', sections['summary'], flags=re.MULTILINE)
+        response_sections.append(f"\n*MUHTASARI*\n{summary.strip()}")
+
+    if sections['details']:
+        details = re.sub(r'^\d+\.\s*', '• ', sections['details'], flags=re.MULTILINE)
+        response_sections.append(f"\n*MAELEZO*\n{details.strip()}")
+
+    if sections['actions']:
+        actions = re.sub(r'^\d+\.\s*', '• ', sections['actions'], flags=re.MULTILINE)
+        response_sections.append(f"\n*HATUA*\n{actions.strip()}")
+
+    if sections['costs']:
+        costs = re.sub(r'^\d+\.\s*', '• ', sections['costs'], flags=re.MULTILINE)
+        response_sections.append(f"\n*GHARAMA*\n{costs.strip()}")
+
+    if sections['source']:
+        response_sections.append(f"\n*CHANZO*\n{sections['source'].strip()}")
+
+    response_sections.append(
+        "\n_Jibu tena ikiwa ungependa maelezo zaidi kuhusu sehemu yoyote._"
+    )
+
+    full_response = "\n".join(response_sections).strip()
+    return _truncate_preserving_paragraphs(full_response, 4200)
