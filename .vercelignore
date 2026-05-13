@@ -1,0 +1,10 @@
+node_modules
+build
+backend
+.DS_Store
+*.log
+.vscode
+.git
+DOCUMENTATION.md
+STREAMING_TTS_SETUP.md
+test_formatter.py
