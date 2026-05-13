@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -19,8 +19,6 @@ import DockNavigation from './DockNavigation';
 import { 
   searchMarketCrop, 
   getUserLocation, 
-  transcribeVoice,
-  getTextToSpeech,
   playAudio
 } from '../services/api';
 
@@ -213,6 +211,8 @@ const MarketPage = () => {
   
   const searchInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const searchQueryRef = useRef('');
+  const handleSearchRef = useRef(null);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -257,8 +257,8 @@ const MarketPage = () => {
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
-        if (searchQuery.trim()) {
-          handleSearch();
+        if (searchQueryRef.current.trim()) {
+          handleSearchRef.current?.();
         }
       };
 
@@ -269,8 +269,12 @@ const MarketPage = () => {
     }
   }, []);
 
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
   // Detect language from text
-  const detectLanguage = (text) => {
+  const detectLanguage = useCallback((text) => {
     // Simple detection based on common Swahili words and patterns
     const swahiliWords = ['bei', 'soko', 'mkulima', 'mboga', 'matunda', 'mahindi', 'mchele', 'samaki', 'nyama', 'nunga', 
                           'nini', 'wapi', 'ngapi', 'karibu', 'asante', 'tafadhali', 'ndege', 'mbegu', 'dawa', 'shamba'];
@@ -281,10 +285,10 @@ const MarketPage = () => {
     const hasSwahiliChars = /[āēīōūñç]/.test(textLower);
     
     return (swahiliCount > 0 || hasSwahiliChars) ? 'sw' : 'en';
-  };
+  }, []);
 
   // Handle search
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
@@ -316,7 +320,11 @@ const MarketPage = () => {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchQuery, userLocation, recentSearches, detectLanguage]);
+
+  useEffect(() => {
+    handleSearchRef.current = handleSearch;
+  }, [handleSearch]);
 
   // Play audio response
   const playAudioResponse = async (audioUrl) => {
@@ -403,7 +411,7 @@ const MarketPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/home')}
                 className="h-8 w-8 rounded-full bg-white flex items-center justify-center shadow-sm hover:bg-[#f0f0f0] transition-colors"
               >
                 <ChevronRight className="h-5 w-5 text-[#666] rotate-180" />

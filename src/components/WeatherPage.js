@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Cloud, Sun, CloudRain, Wind, Droplets, 
-  MapPin, Sprout, Clock, ChevronRight, 
+  MapPin, Sprout, Clock,
   CloudLightning, CloudSnow, Eye, Calendar,
   ArrowLeft
 } from 'lucide-react';
@@ -229,10 +229,12 @@ const WeatherPage = () => {
     if (!weather || !weather.weather) return [];
     
     const temp = weather.weather.temperature || 20;
-    const rainfall = weather.weather.annual_rainfall || weather.weather.rainfall_last_24h || 0;
+    const rainfall = weather.weather.annual_rainfall ?? weather.weather.rainfall_last_24h ?? null;
     
     return Object.entries(kenyanCrops).filter(([key, crop]) => {
-      return temp >= crop.tempRange.min && temp <= crop.tempRange.max;
+      const tempMatch = temp >= crop.tempRange.min && temp <= crop.tempRange.max;
+      const rainMatch = rainfall === null || (rainfall >= crop.rainfall.min && rainfall <= crop.rainfall.max);
+      return tempMatch && rainMatch;
     }).map(([key, crop]) => ({
       ...crop,
       id: key,

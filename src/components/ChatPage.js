@@ -753,7 +753,7 @@ const ChatPage = () => {
       <div className="mx-auto min-h-screen w-full max-w-[420px] border-x border-[#e6e6e6] bg-[#f5f5f5] flex flex-col">
         <header className="flex items-center justify-between border-b border-[#d5d5d5] px-3 py-2">
           <div className="flex items-center gap-2">
-            <ArrowLeft onClick={() => navigate('/')} className="h-5 w-5 text-[#2f2f2f] cursor-pointer" />
+            <ArrowLeft onClick={() => navigate('/home')} className="h-5 w-5 text-[#2f2f2f] cursor-pointer" />
             <div className="h-9 w-9 rounded-full bg-[radial-gradient(circle_at_50%_20%,#4a5666,#1f3046)] border-2 border-[#66b06f]" />
             <div>
               <div className="text-title text-[#282828]">Kilimo Advisor</div>

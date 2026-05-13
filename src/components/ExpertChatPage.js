@@ -679,7 +679,7 @@ const ExpertChatPage = () => {
       <div className="mx-auto min-h-screen w-full max-w-[420px] border-x border-[#e6e6e6] bg-[#f5f5f5] flex flex-col">
         <header className="flex items-center justify-between border-b border-[#d5d5d5] px-3 py-2">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/')} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+            <button onClick={() => navigate('/home')} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
               <ArrowLeft className="h-5 w-5 text-[#2f2f2f]" />
             </button>
             <div>
@@ -698,7 +698,7 @@ const ExpertChatPage = () => {
             <span className="rounded-full bg-[#e6e6e6] px-3 py-1 text-small text-[#666]">Today</span>
           </div>
 
-          {/* Farm Status Card */}
+          {/* Farm Status Card 
           <div className="mt-3 rounded-2xl border border-[#d1d1d1] bg-white p-3">
             <div className="flex items-center gap-2 text-[14px] text-[#6a4e43]">
               <div className="h-8 w-8 rounded-xl bg-[#f3d5c6] flex items-center justify-center">
@@ -719,7 +719,7 @@ const ExpertChatPage = () => {
                 <p className="text-subtitle font-semibold text-[#4b4b4b]">2 Days</p>
               </div>
             </div>
-          </div>
+          </div>*/}
 
           {/* Weather Card */}
           <div 
@@ -809,7 +809,7 @@ const ExpertChatPage = () => {
               <div className="h-7 w-7 rounded-full bg-[#e3e3e3] flex items-center justify-center text-[18px] animate-pulse">
                 ◉
               </div>
-              <span className="text-title">AI is analyzing...</span>
+              <span className="text-title"><small>AI is analyzing.....</small></span>
             </div>
           )}
 

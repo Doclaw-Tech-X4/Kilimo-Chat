@@ -57,7 +57,7 @@ const AboutPage = () => {
       <div className="mx-auto min-h-screen w-full max-w-[420px] bg-[#f5f5f5] border-x border-[#e6e6e6]">
         <header className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/')} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+            <button onClick={() => navigate('/home')} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
               <ArrowLeft className="h-5 w-5 text-[#2f2f2f]" />
             </button>
             <div className="h-6 w-6 rounded-full bg-[#0f7e39] flex items-center justify-center">
@@ -98,12 +98,12 @@ const AboutPage = () => {
 
           <section className="mt-6">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-caption tracking-[0.18em] text-[#3f3f3f]">INTERACTIVE SCENARIOS</h2>
+              <h2 className="text-caption tracking-[0.18em] text-[#3f3f3f]"><b>INTERACTIVE SCENARIOS</b></h2>
               <span className="text-xs tracking-wide text-[#6d6d6d]">TAP TO TEST</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button 
-                onClick={() => navigate('/expert-chat')}
+                onClick={() => navigate('/expertchat')}
                 className="rounded-2xl border border-[#dedede] bg-[#f6f6f6] p-3 text-left hover:bg-[#ebefeb] transition-colors"
               >
                 <div className="mb-2 h-10 w-10 rounded-xl bg-[#ebefeb] flex items-center justify-center">
@@ -133,7 +133,7 @@ const AboutPage = () => {
               </button>
 
               <button 
-                onClick={() => navigate('/expert-chat')}
+                onClick={() => navigate('/market')}
                 className="rounded-2xl border border-[#dedede] bg-[#f6f6f6] p-3 text-left hover:bg-[#ebefeb] transition-colors"
               >
                 <div className="mb-2 h-10 w-10 rounded-xl bg-[#ebefeb] flex items-center justify-center">
@@ -180,7 +180,7 @@ const AboutPage = () => {
                 The future of farming is here. Get instant crop diagnosis, weather alerts, and expert advice - all for free.
               </p>
               <button 
-                onClick={() => navigate('/chat')}
+                onClick={() => navigate('/expertchat')}
                 className="bg-white text-[#148d42] px-6 py-2.5 rounded-full font-semibold text-sm hover:bg-white/90 transition-all hover:scale-105 active:scale-95 shadow-lg"
               >
                 Start Chatting Now
@@ -222,13 +222,13 @@ const AboutPage = () => {
             </p>
             <div className="flex gap-3 justify-center">
               <button 
-                onClick={() => navigate('/chat')}
+                onClick={() => navigate('/expertchat')}
                 className="bg-[#148d42] text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-[#0f7e39] transition-all hover:scale-105 active:scale-95"
               >
                 Chat Now
               </button>
               <button 
-                onClick={() => navigate('/expert-chat')}
+                onClick={() => navigate('/expertchat')}
                 className="bg-white text-[#148d42] border border-[#148d42] px-5 py-2 rounded-full text-sm font-medium hover:bg-[#148d42]/5 transition-all"
               >
                 Expert Help

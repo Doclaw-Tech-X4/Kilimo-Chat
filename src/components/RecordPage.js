@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, ShoppingBag, Sun, HelpCircle, Mic, Send, X, ArrowLeft, Volume2, Pause } from 'lucide-react'
-import { sendChatMessage, formatTimestamp } from '../services/api'
+import { MessageCircle, Mic, Send, X, ArrowLeft, Volume2, Pause } from 'lucide-react'
+import { sendChatMessage } from '../services/api'
 import DockNavigation from './DockNavigation'
 
 function RecordPage() {
@@ -15,6 +15,8 @@ function RecordPage() {
     
     const timerRef = useRef(null);
     const recognitionRef = useRef(null);
+    const isRecordingRef = useRef(false);
+    const startRecordingRef = useRef(null);
     const isNavigatingRef = useRef(false);
     const hasProcessedRef = useRef(false);
 
@@ -103,8 +105,8 @@ function RecordPage() {
         
         // Auto-start recording when page loads
         setTimeout(() => {
-            if (!isRecording && !hasProcessedRef.current) {
-                startRecording();
+            if (!isRecordingRef.current && !hasProcessedRef.current) {
+                startRecordingRef.current?.();
             }
         }, 500);
         
@@ -115,6 +117,10 @@ function RecordPage() {
             }
         };
     }, []);
+
+    useEffect(() => {
+        isRecordingRef.current = isRecording;
+    }, [isRecording]);
 
     // Update timer
     useEffect(() => {
@@ -130,7 +136,7 @@ function RecordPage() {
         };
     }, [isRecording]);
 
-    const startRecording = () => {
+    const startRecording = useCallback(() => {
         setIsRecording(true);
         setRecordingTime(0);
         setTranscribedText('');
@@ -143,7 +149,11 @@ function RecordPage() {
                 console.log('Recognition already started');
             }
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        startRecordingRef.current = startRecording;
+    }, [startRecording]);
 
     const stopRecording = async () => {
         setIsRecording(false);
@@ -212,7 +222,7 @@ function RecordPage() {
             <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-16 bg-white border-b border-gray-100 shadow-sm">
                 <div className="flex items-center gap-3">
                     <button 
-                        onClick={() => navigate('/')} 
+                        onClick={() => navigate('/home')} 
                         className="p-2 hover:bg-gray-100 rounded-full transition-all"
                     >
                         <ArrowLeft className="h-5 w-5 text-gray-600" />

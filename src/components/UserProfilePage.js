@@ -17,12 +17,8 @@ import {
   X
 } from 'lucide-react';
 import {
-  Box,
-  Typography,
-  Button,
   Alert,
   CircularProgress,
-  Chip
 } from '@mui/material';
 
 const UserProfilePage = () => {

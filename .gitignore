@@ -118,6 +118,7 @@ backend/.env.*
 backend/config/local.py
 backend/config/production.py
 backend/instance/
+backend/uploads/
 *.key
 *.pem
 *.cert
@@ -154,6 +155,9 @@ media/
 *.sublime-workspace
 .atom/
 .brackets.json
+.cursor
+.windsurf
+
 
 # ============================================
 # OS SPECIFIC

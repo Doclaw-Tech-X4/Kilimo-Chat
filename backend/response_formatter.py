@@ -37,18 +37,18 @@ def polish_whatsapp_message(text: str, lang: str = "en") -> str:
 
     # Underscore section headers from model prompts → bold labels
     _section_pairs: List[tuple[str, str]] = [
-        (r"(?im)^_summary_\s*:\s*$", "*SUMMARY*"),
-        (r"(?im)^_details from search_\s*:\s*$", "*DETAILS*"),
-        (r"(?im)^_what to do_\s*:\s*$", "*NEXT STEPS*"),
-        (r"(?im)^_costs_\s*:\s*$", "*COSTS*"),
-        (r"(?im)^_where info came from_\s*:\s*$", "*SOURCE*"),
-        (r"(?im)^_muhtasari_\s*:\s*$", "*MUHTASARI*"),
-        (r"(?im)^_maelezo kutoka kwenye hazina_\s*:\s*$", "*MAELEZO*"),
-        (r"(?im)^_maelezo kutoka kwenye hati_\s*:\s*$", "*MAELEZO*"),
-        (r"(?im)^_maelezo_\s*:\s*$", "*MAELEZO*"),
-        (r"(?im)^_unachofanya_\s*:\s*$", "*HATUA*"),
-        (r"(?im)^_gharama_\s*:\s*$", "*GHARAMA*"),
-        (r"(?im)^_taarifa ilitoka wapi_\s*:\s*$", "*CHANZO*"),
+        (r"(?im)^_summary_\s*:\s*$", "SUMMARY: "),
+        (r"(?im)^_details from search_\s*:\s*$", "DETAILS: "),
+        (r"(?im)^_what to do_\s*:\s*$", "NEXT STEPS: "),
+        (r"(?im)^_costs_\s*:\s*$", "COSTS: "),
+        (r"(?im)^_where info came from_\s*:\s*$", "SOURCE: "),
+        (r"(?im)^_muhtasari_\s*:\s*$", "MUHTASARI: "),
+        (r"(?im)^_maelezo kutoka kwenye hazina_\s*:\s*$", "MAELEZO: "),
+        (r"(?im)^_maelezo kutoka kwenye hati_\s*:\s*$", "MAELEZO: "),
+        (r"(?im)^_maelezo_\s*:\s*$", "MAELEZO: "),
+        (r"(?im)^_unachofanya_\s*:\s*$", "HATUA: "),
+        (r"(?im)^_gharama_\s*:\s*$", "GHARAMA: "),
+        (r"(?im)^_taarifa ilitoka wapi_\s*:\s*$", "CHANZO: "),
     ]
     for pattern, repl in _section_pairs:
         t = re.sub(pattern, repl, t)
@@ -239,26 +239,26 @@ def _build_english_response(sections: dict) -> str:
     # Summary section
     if sections['summary']:
         summary = re.sub(r'^\d+\.\s*', '• ', sections['summary'], flags=re.MULTILINE)
-        response_sections.append(f"\n*SUMMARY*\n{summary.strip()}")
+        response_sections.append(f"\n SUMMARY: \n{summary.strip()}")
 
     # Details section
     if sections['details']:
         details = re.sub(r'^\d+\.\s*', '• ', sections['details'], flags=re.MULTILINE)
-        response_sections.append(f"\n*DETAILS*\n{details.strip()}")
+        response_sections.append(f"\n DETAILS: \n{details.strip()}")
 
     # Actions section
     if sections['actions']:
         actions = re.sub(r'^\d+\.\s*', '• ', sections['actions'], flags=re.MULTILINE)
-        response_sections.append(f"\n*NEXT STEPS*\n{actions.strip()}")
+        response_sections.append(f"\n NEXT STEPS: \n{actions.strip()}")
 
     # Costs section
     if sections['costs']:
         costs = re.sub(r'^\d+\.\s*', '• ', sections['costs'], flags=re.MULTILINE)
-        response_sections.append(f"\n*COSTS*\n{costs.strip()}")
+        response_sections.append(f"\n COSTS: \n{costs.strip()}")
 
     # Source section
     if sections['source']:
-        response_sections.append(f"\n*SOURCE*\n{sections['source'].strip()}")
+        response_sections.append(f"\n SOURCE: \n{sections['source'].strip()}")
 
     response_sections.append(
         "\n_Reply with a follow-up if you want more detail on any section._"
@@ -278,22 +278,22 @@ def _build_swahili_response(sections: dict) -> str:
 
     if sections['summary']:
         summary = re.sub(r'^\d+\.\s*', '• ', sections['summary'], flags=re.MULTILINE)
-        response_sections.append(f"\n*MUHTASARI*\n{summary.strip()}")
+        response_sections.append(f"\n MUHTASARI: \n{summary.strip()}")
 
     if sections['details']:
         details = re.sub(r'^\d+\.\s*', '• ', sections['details'], flags=re.MULTILINE)
-        response_sections.append(f"\n*MAELEZO*\n{details.strip()}")
+        response_sections.append(f"\n MAELEZO: \n{details.strip()}")
 
     if sections['actions']:
         actions = re.sub(r'^\d+\.\s*', '• ', sections['actions'], flags=re.MULTILINE)
-        response_sections.append(f"\n*HATUA*\n{actions.strip()}")
+        response_sections.append(f"\n HATUA: \n{actions.strip()}")
 
     if sections['costs']:
         costs = re.sub(r'^\d+\.\s*', '• ', sections['costs'], flags=re.MULTILINE)
-        response_sections.append(f"\n*GHARAMA*\n{costs.strip()}")
+        response_sections.append(f"\n GHARAMA: \n{costs.strip()}")
 
     if sections['source']:
-        response_sections.append(f"\n*CHANZO*\n{sections['source'].strip()}")
+        response_sections.append(f"\n CHANZO: \n{sections['source'].strip()}")
 
     response_sections.append(
         "\n_Jibu tena ikiwa ungependa maelezo zaidi kuhusu sehemu yoyote._"
