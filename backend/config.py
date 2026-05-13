@@ -5,22 +5,23 @@ Loads environment variables and defines constants, prompts, and settings.
 
 import os
 import logging
+from pathlib import Path
 from typing import List
+
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Base paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-UPLOADS_DIR = os.path.join(BASE_DIR, "uploads", "voice")
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
+# Base paths (pathlib.Path for correct ``/`` joining on all platforms)
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+UPLOADS_DIR = BASE_DIR / "uploads" / "voice"
+LOGS_DIR = BASE_DIR / "logs"
 
 # Create directories
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(UPLOADS_DIR, exist_ok=True)
-os.makedirs(LOGS_DIR, exist_ok=True)
+for _dir in (DATA_DIR, UPLOADS_DIR, LOGS_DIR):
+    _dir.mkdir(parents=True, exist_ok=True)
 
 # API Keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -207,8 +208,8 @@ def setup_logging() -> logging.Logger:
     logger.addHandler(console_handler)
     
     # File handler
-    log_file = os.path.join(LOGS_DIR, "kilimoChat.log")
-    file_handler = logging.FileHandler(log_file)
+    log_file = LOGS_DIR / "kilimoChat.log"
+    file_handler = logging.FileHandler(str(log_file))
     file_handler.setLevel(logging.DEBUG)
     file_format = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"

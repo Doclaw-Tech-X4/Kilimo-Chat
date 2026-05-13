@@ -38,7 +38,8 @@ from config import (
     GEMINI_API_KEY,
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
-    TWILIO_WHATSAPP_NUMBER
+    TWILIO_WHATSAPP_NUMBER,
+    UPLOADS_DIR,
 )
 
 # Import requests for downloading Twilio media
@@ -73,6 +74,7 @@ from language_utils import detect_language, validate_response_language
 from search_handler import search_and_get_context
 from ai_handler import get_ai_response, check_quick_response, get_ai_response_streaming
 from voice_handler import process_voice_message, cleanup_old_voice_files as cleanup_voice
+from utils.messaging import send_long_whatsapp_message
 
 # Import Gemini handler for image/video analysis
 try:
@@ -558,15 +560,35 @@ async def process_whatsapp_message(
         else:
             # Text message
             ai_response = await process_text_message(from_number, body)
-        
-        # Send response back via Twilio
-        twilio_client.messages.create(
+
+        if not (ai_response and str(ai_response).strip()):
+            ai_response = (
+                "Sorry, I could not generate a response. Please try again. 🙏"
+            )
+
+        # Send response back via Twilio (chunked under 1600-char limit)
+        send_result = send_long_whatsapp_message(
+            twilio_client,
             from_=TWILIO_WHATSAPP_NUMBER,
-            body=ai_response,
-            to=from_number
+            to=from_number,
+            body=str(ai_response),
+            log=logger,
         )
-        
-        logger.info(f"Response sent to {from_number}")
+        if send_result.success:
+            logger.info(
+                "Response sent to %s (%s chunk(s), sids=%s)",
+                from_number,
+                send_result.chunks_sent,
+                send_result.message_sids,
+            )
+        else:
+            logger.error(
+                "Partial or failed Twilio send to %s: %s",
+                from_number,
+                send_result.error,
+            )
+            if send_result.chunks_sent == 0:
+                raise RuntimeError(send_result.error or "Twilio send failed")
         
     except Exception as e:
         logger.error(f"Background processing error: {e}", exc_info=True)

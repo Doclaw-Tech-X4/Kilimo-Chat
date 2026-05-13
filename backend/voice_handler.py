@@ -5,11 +5,10 @@ Download → Save → Transcribe → Translate → Process → Respond
 """
 
 import uuid
-import os
 import logging
 import requests
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Callable
 from datetime import datetime, timedelta
 
 from groq import Groq
@@ -40,6 +39,7 @@ from database import (
     get_voice_message,
     get_user_language
 )
+from utils.files import voice_upload_file_path
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -131,7 +131,7 @@ def transcribe_audio_with_whisper(audio_path: Path) -> Optional[str]:
 def process_voice_message(
     user_phone: str,
     media_url: str,
-    get_ai_response_func: callable
+    get_ai_response_func: Callable[[str, str, str], str],
 ) -> str:
     """
     Complete voice message processing pipeline.
@@ -146,16 +146,9 @@ def process_voice_message(
     """
     # Generate unique ID for this voice message
     voice_id = str(uuid.uuid4())
-    
-    # Determine file extension from URL or default to .ogg
-    file_ext = ".ogg"
-    if "." in media_url:
-        ext = media_url.split(".")[-1].split("?")[0]
-        if ext in ["ogg", "mp3", "m4a", "wav", "webm"]:
-            file_ext = f".{ext}"
-    
-    # Local file path
-    local_path = UPLOADS_DIR / f"{voice_id}{file_ext}"
+
+    # Local file path (pathlib + allowlisted extension)
+    local_path = voice_upload_file_path(UPLOADS_DIR, voice_id, media_url)
     
     # Create database record
     db_id = create_voice_message(user_phone, media_url, str(local_path))

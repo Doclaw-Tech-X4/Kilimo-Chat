@@ -17,6 +17,7 @@ from database_auth import (
     get_user_profile, create_or_update_user_profile
 )
 from config import logger
+from utils.datetime_utils import utc_now
 
 # Create router
 auth_router = APIRouter(prefix="/api/auth", tags=["authentication"])
@@ -477,7 +478,7 @@ async def google_callback(request: Request):
                             "$set": {
                                 "google_id": google_id,
                                 "profile_picture": picture,
-                                "updated_at": auth_handler.datetime.utcnow()
+                                "updated_at": utc_now()
                             }
                         }
                     )

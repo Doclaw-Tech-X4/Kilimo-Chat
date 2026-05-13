@@ -24,6 +24,7 @@ from config import (
     MONGODB_DB_NAME,
     logger
 )
+from utils.datetime_utils import utc_now
 
 # Global MongoDB client
 mongo_client: Optional[MongoClient] = None
@@ -161,7 +162,7 @@ def get_or_create_user(phone: str, detected_language: Optional[str] = None) -> U
     # Try to find existing user
     existing = users.find_one({"phone": phone})
     
-    now = datetime.utcnow()
+    now = utc_now()
     
     if existing:
         # Update existing user
@@ -219,7 +220,7 @@ def update_user_language(phone: str, language: str) -> None:
     users: Collection = db.users
     users.update_one(
         {"phone": phone},
-        {"$set": {"preferred_language": language, "updated_at": datetime.utcnow()}}
+        {"$set": {"preferred_language": language, "updated_at": utc_now()}}
     )
     logger.info(f"Updated user {phone} language to {language}")
 
@@ -245,7 +246,7 @@ def save_message(
         "message_type": message_type,
         "content": content,
         "ai_response": ai_response,
-        "timestamp": datetime.utcnow()
+        "timestamp": utc_now()
     }
     
     messages.insert_one(doc)
@@ -264,7 +265,7 @@ def create_voice_message(
         return message_id
     
     voice_msgs: Collection = db.voice_messages
-    now = datetime.utcnow()
+    now = utc_now()
     
     doc = {
         "_id": message_id,
@@ -299,7 +300,7 @@ def update_voice_message(
     if not updates:
         return
     
-    updates["updated_at"] = datetime.utcnow()
+    updates["updated_at"] = utc_now()
     
     voice_msgs: Collection = db.voice_messages
     voice_msgs.update_one(
@@ -355,7 +356,7 @@ def save_search_log(
         "query": query,
         "results_json": json.dumps(results, ensure_ascii=False),
         "used_in_response": used_in_response,
-        "timestamp": datetime.utcnow()
+        "timestamp": utc_now()
     }
     
     search_logs.insert_one(doc)

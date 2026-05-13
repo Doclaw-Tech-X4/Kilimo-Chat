@@ -18,6 +18,7 @@ from email.mime.multipart import MIMEMultipart
 import smtplib
 
 from config import logger
+from utils.datetime_utils import utc_now
 
 # JWT Configuration
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
@@ -138,8 +139,8 @@ def create_jwt_token(user_id: str, phone_number: str, email: str) -> str:
         "user_id": user_id,
         "phone_number": phone_number,
         "email": email,
-        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
-        "iat": datetime.utcnow(),
+        "exp": utc_now() + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat": utc_now(),
         "type": "access"
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

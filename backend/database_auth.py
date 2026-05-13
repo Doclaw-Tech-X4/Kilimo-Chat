@@ -16,6 +16,7 @@ import gridfs
 
 from database_mongo import mongo_client, db, logger
 from auth_handler import AuthUser, format_phone_number
+from utils.datetime_utils import utc_now
 
 
 # GridFS for file storage
@@ -108,7 +109,7 @@ def create_auth_user(phone_number: str, full_name: str, email: str,
                 return False, "Email already registered", None
         
         user_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = utc_now()
         
         user_doc = {
             "_id": user_id,
@@ -195,7 +196,7 @@ def update_verification_code(user_id: str, code: str) -> bool:
     
     try:
         auth_users: Collection = db.auth_users
-        expires = datetime.utcnow() + timedelta(minutes=30)
+        expires = utc_now() + timedelta(minutes=30)
         
         result = auth_users.update_one(
             {"_id": user_id},
@@ -203,7 +204,7 @@ def update_verification_code(user_id: str, code: str) -> bool:
                 "$set": {
                     "verification_code": code,
                     "verification_expires": expires,
-                    "updated_at": datetime.utcnow()
+                    "updated_at": utc_now()
                 }
             }
         )
@@ -225,7 +226,7 @@ def verify_email_code(user_id: str, code: str) -> bool:
         user = auth_users.find_one({
             "_id": user_id,
             "verification_code": code,
-            "verification_expires": {"$gt": datetime.utcnow()}
+            "verification_expires": {"$gt": utc_now()}
         })
         
         if not user:
@@ -239,7 +240,7 @@ def verify_email_code(user_id: str, code: str) -> bool:
                     "is_verified": True,
                     "verification_code": None,
                     "verification_expires": None,
-                    "updated_at": datetime.utcnow()
+                    "updated_at": utc_now()
                 }
             }
         )
@@ -258,7 +259,7 @@ def set_password_reset_token(user_id: str, token: str) -> bool:
     
     try:
         auth_users: Collection = db.auth_users
-        expires = datetime.utcnow() + timedelta(hours=1)
+        expires = utc_now() + timedelta(hours=1)
         
         result = auth_users.update_one(
             {"_id": user_id},
@@ -266,7 +267,7 @@ def set_password_reset_token(user_id: str, token: str) -> bool:
                 "$set": {
                     "reset_token": token,
                     "reset_token_expires": expires,
-                    "updated_at": datetime.utcnow()
+                    "updated_at": utc_now()
                 }
             }
         )
@@ -287,7 +288,7 @@ def verify_reset_token(token: str) -> Optional[str]:
         auth_users: Collection = db.auth_users
         user = auth_users.find_one({
             "reset_token": token,
-            "reset_token_expires": {"$gt": datetime.utcnow()}
+            "reset_token_expires": {"$gt": utc_now()}
         })
         
         return user["_id"] if user else None
@@ -311,7 +312,7 @@ def reset_password(user_id: str, new_password_hash: str) -> bool:
                     "password_hash": new_password_hash,
                     "reset_token": None,
                     "reset_token_expires": None,
-                    "updated_at": datetime.utcnow()
+                    "updated_at": utc_now()
                 }
             }
         )
@@ -334,8 +335,8 @@ def update_last_login(user_id: str) -> bool:
             {"_id": user_id},
             {
                 "$set": {
-                    "last_login": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
+                    "last_login": utc_now(),
+                    "updated_at": utc_now()
                 }
             }
         )
@@ -357,7 +358,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> bool:
         if not update_data:
             return False
         
-        update_data["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = utc_now()
         
         auth_users: Collection = db.auth_users
         result = auth_users.update_one(
@@ -391,7 +392,7 @@ def save_user_file(user_id: str, file_data: bytes, filename: str,
             content_type=content_type,
             metadata={
                 "user_id": user_id,
-                "uploaded_at": datetime.utcnow()
+                "uploaded_at": utc_now()
             }
         )
         
@@ -405,7 +406,7 @@ def save_user_file(user_id: str, file_data: bytes, filename: str,
             "file_type": content_type,
             "file_size": len(file_data),
             "analysis_result": analysis_result,
-            "uploaded_at": datetime.utcnow()
+            "uploaded_at": utc_now()
         }
         uploads_meta.insert_one(upload_doc)
         
@@ -530,7 +531,7 @@ def create_or_update_user_profile(user_id: str, profile_data: Dict) -> Tuple[boo
         
         # Add timestamps
         profile_data['user_id'] = user_id
-        profile_data['updated_at'] = datetime.utcnow()
+        profile_data['updated_at'] = utc_now()
         
         # Check if profile exists
         existing = user_profiles.find_one({"user_id": user_id})
@@ -544,7 +545,7 @@ def create_or_update_user_profile(user_id: str, profile_data: Dict) -> Tuple[boo
             return True, "Profile updated successfully"
         else:
             # Create new profile
-            profile_data['created_at'] = datetime.utcnow()
+            profile_data['created_at'] = utc_now()
             user_profiles.insert_one(profile_data)
             return True, "Profile created successfully"
         
