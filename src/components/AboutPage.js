@@ -158,20 +158,7 @@ const AboutPage = () => {
           </section>
         </main>
 
-        <footer className="border-t border-[#e5e5e5] px-4 pt-4 pb-20 text-center">
-          <div className="flex items-center justify-center gap-2 text-[#2f8a45]">
-            <div className="h-5 w-5 rounded-full bg-[#2f8a45] flex items-center justify-center">
-              <Sprout className="h-3 w-3 text-white" />
-            </div>
-            <span className="text-title font-semibold">KilimoChat</span>
-          </div>
-          <p className="mt-1 text-body text-[#767676]">Built for Kenya 🇰🇪</p>
-          <div className="mt-2 flex justify-center gap-7 text-body text-[#777]">
-            <span>About</span>
-            <span>GitHub</span>
-            <span>Privacy</span>
-          </div>
-        </footer>
+        
 
         {/* Beautiful KilimoAssistant Advert Section */}
         <section className="px-4 pb-8 mt-4">
@@ -249,6 +236,20 @@ const AboutPage = () => {
             </div>
           </div>
         </section>
+        <footer className="border-t border-[#e5e5e5] px-4 pt-4 pb-20 text-center">
+          <div className="flex items-center justify-center gap-2 text-[#2f8a45]">
+            <div className="h-5 w-5 rounded-full bg-[#2f8a45] flex items-center justify-center">
+              <Sprout className="h-3 w-3 text-white" />
+            </div>
+            <span className="text-title font-semibold">KilimoChat</span>
+          </div>
+          <p className="mt-1 text-body text-[#767676]">Built for Kenya 🇰🇪</p>
+          <div className="mt-2 flex justify-center gap-7 text-body text-[#777]">
+            <span>About</span>
+            <span>GitHub</span>
+            <span>Privacy</span>
+          </div>
+        </footer>
 
         <DockNavigation />
       </div>

@@ -4,6 +4,7 @@ Manages Groq LLaMA 3.3 integration for generating agricultural responses.
 """
 
 import logging
+import re
 from typing import Optional, List, Dict, Any
 from groq import Groq
 
@@ -24,6 +25,7 @@ from knowledge_base import search_knowledge, get_kb_stats
 from document_ingestion import get_ingestion_pipeline
 from language_utils import translate_response
 from database_auth import get_user_profile
+from response_formatter import format_response
 
 # RAG threshold - minimum confidence to use knowledge base answer
 RAG_CONFIDENCE_THRESHOLD = 0.75
@@ -92,24 +94,33 @@ def clean_ai_response(response: str) -> str:
     
     # If response is too short after cleaning, add a helpful fallback
     if len(response.strip()) < 20:
-        response = "👋 I'd be happy to help with your farming question. Could you share more details about your crop or specific concern? For example, what type of crop, the size of your farm, and where you're located. This will help me give you better advice!"
+        response = "I'd be happy to help with your farming question. Could you share more details about your crop or specific concern? For example, what type of crop, the size of your farm, and where you're located. This will help me give you better advice!"
     
     return response.strip()
 
 
 def enforce_response_format(response: str, has_search: bool = True) -> str:
     """
-    Ensure response follows the exact 5-section format.
+    Ensure response follows the exact 5-section format without emojis.
     Aggressively reformats any response that doesn't match.
     """
     import re
     
-    # Check if response already has all 5 required sections
-    has_summary = bool(re.search(r"📌\s*SUMMARY:", response, re.IGNORECASE))
-    has_details = bool(re.search(r"📋\s*DETAILS\s*FROM\s*SEARCH:", response, re.IGNORECASE))
-    has_actions = bool(re.search(r"🎯\s*WHAT\s*TO\s*DO:", response, re.IGNORECASE))
-    has_costs = bool(re.search(r"💰\s*COSTS:", response, re.IGNORECASE))
-    has_source = bool(re.search(r"📊\s*WHERE\s*INFO\s*CAME\s*FROM:", response, re.IGNORECASE))
+    # Check if response is a greeting - return short clear answer
+    greeting_patterns = [
+        r"^(hello|hi|hey|greetings|good morning|good afternoon|good evening|karibu|habari|jambo)",
+        r"^(how are you|how do you do|unaendeleaje|vipi)",
+    ]
+    for pattern in greeting_patterns:
+        if re.match(pattern, response.strip(), re.IGNORECASE):
+            return "Hello! I'm here to help with your farming questions. What would you like to know about crops, diseases, weather, or market prices?"
+    
+    # Check if response already has all 5 required sections (uppercase underlined headings with spacing)
+    has_summary = bool(re.search(r"(?i)_summary_:\s*\n", response))
+    has_details = bool(re.search(r"(?i)_details from search_:\s*\n", response))
+    has_actions = bool(re.search(r"(?i)_what to do_:\s*\n", response))
+    has_costs = bool(re.search(r"(?i)_costs_:\s*\n", response))
+    has_source = bool(re.search(r"(?i)_where info came from_:\s*\n", response))
     
     # If all 5 sections are present, return as-is
     if has_summary and has_details and has_actions and has_costs and has_source:
@@ -200,23 +211,28 @@ def enforce_response_format(response: str, has_search: bool = True) -> str:
     
     source = source_lines[0] if source_lines else "From verified agricultural knowledge base and best farming practices"
     
-    # Build final formatted response
-    formatted = f"""📌 SUMMARY:
+    # Build final formatted response with uppercase underlined headings and proper spacing
+    formatted = f"""_summary_:
+
 {summary}
 
-📋 DETAILS FROM SEARCH:
+_details from search_:
+
 {details}
 
-🎯 WHAT TO DO:
+_what to do_:
+
 {"\n".join(actions)}
 
-💰 COSTS:
-{costs}
-💰 Prices as of 2024 from web search
+_costs_:
 
-📊 WHERE INFO CAME FROM:
+{costs}
+Prices as of 2024 from web search
+
+_where info came from_:
+
 {source}"""
-    
+
     return formatted
 
 
@@ -289,85 +305,78 @@ When the farmer asks about their crops, farm, or location, use this profile info
     
     # Formatting instructions - CRITICAL: MUST USE THIS EXACT FORMAT
     formatting_instruction = f"""
-⚠️⚠️⚠️ CRITICAL FORMATTING RULE - YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE ⚠️⚠️⚠️
+CRITICAL FORMATTING RULE - YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE
 
 YOU ARE REQUIRED TO USE ALL 5 SECTIONS BELOW. DO NOT SKIP ANY SECTION.
 
-═══════════════════════════════════════════════════════════════
+================================================================
 
 SECTION 1 - START WITH THIS EXACT HEADER:
-📌 SUMMARY:
+_SUMMARY_:
 - Write 2-3 sentences giving the direct answer
 - Keep it brief and practical
-break
 
 SECTION 2 - USE THIS EXACT HEADER:
-📋 DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
 - Use bullet points starting with "- " (dash followed by space)
 - List 3-5 key facts
 - Include prices, locations, dates
-break
 
 SECTION 3 - USE THIS EXACT HEADER:
-🎯 WHAT TO DO:
+_WHAT TO DO_:
 - Numbered steps: 1. 2. 3.
 - Write 3-4 clear action items
 - Make them practical for farmers
-break
+
 SECTION 4 - USE THIS EXACT HEADER:
-💰 COSTS:
+_COSTS_:
 - Use "- " for bullet points
 - List ALL costs with Ksh amounts
-- ALWAYS end this section with: "💰 Prices as of [month year] from web search"
-break
+- ALWAYS end this section with: "Prices as of [month year] from web search"
 
 SECTION 5 - USE THIS EXACT HEADER:
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
 - Write "From web search: [source description]"
 - Or "From verified agricultural database" if using KB
 
-═══════════════════════════════════════════════════════════════
+================================================================
 
 MANDATORY RULES:
-🚫 NEVER use any other section headers (NO "Crop Identified", NO "Observations", etc.)
-🚫 NEVER skip any of the 5 sections above
-🚫 ALWAYS use "- " (dash space) for bullet points
-🚫 ALWAYS use "1. 2. 3." format for WHAT TO DO section
-🚫 ALWAYS put 1 blank line between each section
-🚫 ALWAYS start with 📌 SUMMARY:
-🚫 ALWAYS end with 📊 WHERE INFO CAME FROM:
+- NEVER use any other section headers (NO "Crop Identified", NO "Observations", etc.)
+- NEVER skip any of the 5 sections above
+- ALWAYS use "- " (dash space) for bullet points
+- ALWAYS use "1. 2. 3." format for what to do section
+- ALWAYS put 1 blank line between each section
+- ALWAYS start with _SUMMARY_:
+- ALWAYS end with _WHERE INFO CAME FROM_:
 
 PERFECT EXAMPLE (COPY THIS STRUCTURE EXACTLY):
 
-📌 SUMMARY:
+_SUMMARY_:
 The price of layer chickens in Nairobi is around Ksh 500-700 per chick. You can find them at local poultry farms or markets.
 
-📋 DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
 - Price: Ksh 500-700 per chick
 - Location: Nairobi, local poultry farms or markets
 - Availability: Usually in stock
-break
 
-🎯 WHAT TO DO:
+_WHAT TO DO_:
 1. Visit local poultry farms or markets in Nairobi.
 2. Compare prices from different sellers.
 3. Ensure you buy healthy chicks.
-break
 
-💰 COSTS:
+_COSTS_:
 - Price per chick: Ksh 500-700
 - Total cost estimate: depends on the number of chicks you buy
-💰 Prices as of March 2024 from web search
-break
+Prices as of March 2024 from web search
 
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
 From web search: various online marketplaces and poultry farms in Nairobi.
-break
 
-═══════════════════════════════════════════════════════════════
+================================================================
 WARNING: Responses that don't use this exact format will be rejected. Use ONLY the 5 sections above."""
     
-    lang_enforcement = f"""⚠️ CRITICAL LANGUAGE RULE - THIS IS THE MOST IMPORTANT INSTRUCTION:
+    lang_enforcement = f"""CRITICAL LANGUAGE RULE - THIS IS THE MOST IMPORTANT INSTRUCTION:
 
 You MUST respond ENTIRELY in {lang_instruction}. 
 - EVERY word, sentence, and section must be in {lang_instruction}
@@ -561,7 +570,7 @@ def get_ai_response_streaming(
     
     # CRITICAL: Language instruction must be FIRST and STRONGEST
     lang_instruction = "Swahili" if target_language == "sw" else "English"
-    lang_enforcement = f"""⚠️ CRITICAL LANGUAGE RULE - THIS IS THE MOST IMPORTANT INSTRUCTION:
+    lang_enforcement = f"""CRITICAL LANGUAGE RULE - THIS IS THE MOST IMPORTANT INSTRUCTION:
 
 You MUST respond ENTIRELY in {lang_instruction}. 
 - EVERY word, sentence, and section must be in {lang_instruction}
@@ -575,24 +584,24 @@ THIS IS MANDATORY. IGNORE ALL OTHER LANGUAGE INSTRUCTIONS IN THIS PROMPT."""
     
     # Add formatting instructions for streaming too
     formatting_instruction = """
-⚠️⚠️⚠️ CRITICAL: YOU MUST USE THIS EXACT FORMAT ⚠️⚠️⚠️
+CRITICAL: YOU MUST USE THIS EXACT FORMAT
 
-📌 SUMMARY:
+_SUMMARY_:
 [2-3 sentence summary]
 
-📋 DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
 - [bullet points]
 
-🎯 WHAT TO DO:
+_WHAT TO DO_:
 1. [step 1]
 2. [step 2]
 3. [step 3]
 
-💰 COSTS:
+_COSTS_:
 - [cost items]
-💰 Prices as of [date] from web search
+Prices as of [date] from web search
 
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
 [source info]
 
 USE ONLY THESE 5 SECTIONS. NEVER SKIP ANY."""
@@ -609,8 +618,8 @@ USE ONLY THESE 5 SECTIONS. NEVER SKIP ANY."""
     kb_result = search_knowledge(user_message, top_k=3, threshold=0.7)
     
     if kb_result["found"] and kb_result["confidence"] >= RAG_CONFIDENCE_THRESHOLD:
-        # Return formatted KB response using 5-section format
-        yield _format_kb_response(kb_result, target_language)
+        # Return formatted KB response using new WhatsApp-friendly format
+        yield format_response("", user_message, target_language)
         return
     
     # Prepare messages for AI
@@ -674,20 +683,12 @@ Please answer using both your knowledge, the web search results, and any verifie
                 full_response += text_chunk
                 yield text_chunk
         
-        # Post-processing: Check if response needs translation
-        if target_language == "sw" and full_response:
-            english_words = ['the', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now', 'summary', 'details', 'what', 'where', 'cost', 'price', 'information', 'came', 'from', 'search', 'web']
-            words = full_response.lower().split()
-            if len(words) > 5:
-                english_count = sum(1 for word in words if word.strip('.,!?;:"()[]{}') in english_words)
-                english_ratio = english_count / len(words)
-                
-                if english_ratio > 0.4:
-                    logger.warning(f"AI responded in English (ratio: {english_ratio:.2f}), suggesting client-side translation")
-                    # Note: We can't re-stream translated content, but we signal it
-                    yield "\n\n[Note: Response may need translation to Swahili]"
-        
-        logger.debug(f"Streaming AI response completed: {full_response[:50]}...")
+        # Post-processing: Apply new WhatsApp-friendly format
+        if full_response:
+            formatted = format_response(full_response, user_message, target_language)
+            yield formatted
+        else:
+            yield get_fallback_response(target_language)
         
     except Exception as e:
         logger.error(f"Streaming AI request failed: {e}")
@@ -709,56 +710,67 @@ def format_search_results_text(results: List[Any]) -> str:
 
 
 def _format_kb_response(kb_result: dict, target_language: str) -> str:
-    """Format knowledge base response using the 5-section format."""
+    """Format knowledge base response using new WhatsApp-friendly format."""
     verified_answer = kb_result["answer"]
     source = kb_result["source"]
     crop = kb_result.get("matched_crop", "")
     
-    # Build the 5-section format for KB responses
+    # Create raw response in old format for the formatter to process
     if target_language == "sw":
-        response = f"""📌 MUHTASARI:
+        raw_response = f"""_MUHTASARI_:
+
 {verified_answer[:200]}...
 
-📋 MAELEZO KUTOKA KWENYE HAZINA:
+_MAELEZO KUTOKA KWENYE HAZINA_:
+
 - {verified_answer[:150]}
 - Taarifa imethibitishwa na {source}
 - Zaidi ya maelezo yanapatikana kwenye hii hazina
 
-🎯 UNACHOFANYA:
+_UNACHOFANYA_:
+
 1. Soma maelezo yote hapo juu kwa uangalifu
 2. Fuata maelekezo yanayohusiana na shida lako
 3. Wasiliana na KALRO 0111-029111 ikiwa unahitaji usaidizi zaidi
 
-💰 GHARAMA:
+_GHARAMA_:
+
 - Bidhaa zinapatikana kwa bei tofauti kulingana na eneo
 - Tembelea agrovet ya karibu kwa bei sahihi
-💰 Bei zinaweza kutofautiana kulingana na eneo na wakati
+Bei zinaweza kutofautiana kulingana na eneo na wakati
 
-� TAARIFA ILITOKA WAPI:
+_TAARIFA ILITOKA WAPI_:
+
 Kutoka: {source} (hazina ya kilimo iliyoidhinishwa)"""
     else:
-        response = f"""📌 SUMMARY:
+        raw_response = f"""_SUMMARY_:
+
 {verified_answer[:200]}...
 
-� DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
+
 - {verified_answer[:150]}
 - Information verified by {source}
 - Additional details available in knowledge base
 
-🎯 WHAT TO DO:
+_WHAT TO DO_:
+
 1. Read the information above carefully
 2. Follow relevant advice for your situation
 3. Contact KALRO 0111-029111 if you need more help
 
-💰 COSTS:
+_COSTS_:
+
 - Products available at varying prices depending on location
 - Visit your local agrovet for exact pricing
-💰 Prices may vary by location and timing
+Prices may vary by location and timing
 
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
+
 From: {source} (verified agricultural knowledge base)"""
     
-    return response
+    # Use the new formatter to convert to WhatsApp-friendly format
+    return format_response(raw_response, "", target_language)
 
 
 def _search_uploaded_documents(query: str, pipeline) -> dict:
@@ -800,115 +812,130 @@ def _search_uploaded_documents(query: str, pipeline) -> dict:
 
 
 def _format_document_response(doc_results: dict, target_language: str) -> str:
-    """Format uploaded document response using 5-section format."""
+    """Format uploaded document response using new WhatsApp-friendly format."""
     answer = doc_results["answer"]
     source = doc_results["source"]
     title = doc_results.get("title", "")
     
+    # Create raw response in old format for the formatter to process
     if target_language == "sw":
-        answer = translate_response(answer, "sw")
-        response = f"""📌 MUHTASARI:
+        raw_response = f"""_MUHTASARI_:
+
 {answer[:200]}...
 
-� MAELEZO KUTOKA KWENYE HATI:
+_MAELEZO KUTOKA KWENYE HATI_:
+
 - {answer[:150]}
 - Taarifa kutoka: {title}
 - Chapisho: {source}
 
-🎯 UNACHOFANYA:
+_UNACHOFANYA_:
+
 1. Soma maelezo yote kwa uangalifu
 2. Fuata maelekezo yanayohusiana na hali yako
 3. Uliza maswali zaidi ikiwa hujielewi
 
-� GHARAMA:
+_GHARAMA_:
+
 - Gharama zinategemea bidhaa na eneo
 - Tembelea agrovet kwa bei sahihi
-💰 Bei zinaweza kutofautiana
+Bei zinaweza kutofautiana
 
-📊 TAARIFA ILITOKA WAPI:
+_TAARIFA ILITOKA WAPI_:
+
 Kutoka: {source} - {title}"""
     else:
-        response = f"""📌 SUMMARY:
+        raw_response = f"""_SUMMARY_:
+
 {answer[:200]}...
 
-� DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
+
 - {answer[:150]}
 - From document: {title}
 - Published by: {source}
 
-🎯 WHAT TO DO:
+_WHAT TO DO_:
+
 1. Read all the information carefully
 2. Follow the advice relevant to your situation
 3. Ask follow-up questions if you need clarification
 
-� COSTS:
+_COSTS_:
+
 - Costs depend on products and your location
 - Visit your local agrovet for exact pricing
-💰 Prices may vary by location
+Prices may vary by location
 
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
+
 From: {source} - {title}"""
     
-    return response
+    # Use the new formatter to convert to WhatsApp-friendly format
+    return format_response(raw_response, "", target_language)
 
 
 def get_fallback_response(language: str = "en") -> str:
     """Get confident fallback response when AI fails."""
+    # Create a generic fallback that the formatter can process
     if language == "sw":
-        return """👋 Habari! Ninaweza kukusaidia na maswali yako ya kilimo.
+        raw_fallback = """Habari! Ninaweza kukusaidia na maswali yako ya kilimo.
 
-🌾 Ninajua mengi kuhusu:
-• Kulima mahindi, maharagwe, na mimea mingine
-• Kutibu wadudu na magonjwa
-• Mbolea na lishe ya mimea
-• Hali ya hewa na wakati wa kupanda
-• Bei za soko
+Ninajua mengi kuhusu:
+- Kulima mahindi, maharagwe, na mimea mingine
+- Kutibu wadudu na magonjwa
+- Mbolea na lishe ya mimea
+- Hali ya hewa na wakati wa kupanda
+- Bei za soko
 
-💡 Uliza swali lolote kuhusu kilimo, nikusaidie!"""
+Uliza swali lolote kuhusu kilimo, nikusaidie!"""
     else:
-        return """👋 Hello! I'm ready to help with your farming questions.
+        raw_fallback = """Hello! I'm ready to help with your farming questions.
 
-🌾 I can assist with:
-• Growing maize, beans, and other crops
-• Treating pests and diseases
-• Fertilizers and plant nutrition
-• Weather timing and planting seasons
-• Market prices and selling
+I can assist with:
+- Growing maize, beans, and other crops
+- Treating pests and diseases
+- Fertilizers and plant nutrition
+- Weather timing and planting seasons
+- Market prices and selling
 
-💡 Ask me anything about farming - I'm here to help!"""
+Ask me anything about farming - I'm here to help!"""
+    
+    # Use the new formatter to make it WhatsApp-friendly
+    return format_response(raw_fallback, "", language)
 
 
 # Specific response templates for common queries
 QUICK_RESPONSES = {
     "greeting": {
-        "en": "Hello! I'm KilimoChat, your farming assistant. How can I help you today? 🌾",
-        "sw": "Habari! Mimi ni KilimoChat, msaidizi wako wa kilimo. Nikusaidie vipi leo? 🌾"
+        "en": "Hello! I'm KilimoChat, your farming assistant. How can I help you today?",
+        "sw": "Habari! Mimi ni KilimoChat, msaidizi wako wa kilimo. Nikusaidie vipi leo?"
     },
     "help": {
         "en": """I can help you with:
-🌱 Crop diseases and pest control
-🌾 Fertilizer recommendations
-🌧️ Weather and farming seasons
-💰 Market prices for crops
-📸 Send photos for diagnosis
+- Crop diseases and pest control
+- Fertilizer recommendations
+- Weather and farming seasons
+- Market prices for crops
+- Send photos for diagnosis
 
 Just ask me anything!""",
         "sw": """Naweza kukusaidia na:
-🌱 Magonjwa ya mimea na udhibiti wa wadudu
-🌾 Mapendekezo ya mbolea
-🌧️ Hali ya hewa na misimu ya kilimo
-💰 Bei za soko kwa mazao
-📸 Tuma picha kwa uchunguzi
+- Magonjwa ya mimea na udhibiti wa wadudu
+- Mapendekezo ya mbolea
+- Hali ya hewa na misimu ya kilimo
+- Bei za soko kwa mazao
+- Tuma picha kwa uchunguzi
 
 Uliza chochote!"""
     },
     "thanks": {
-        "en": "You're welcome! Feel free to ask anytime. Happy farming! 🚜",
-        "sw": "Karibu! Uliza wakati wowote. Kilimo cha furaha! 🚜"
+        "en": "You're welcome! Feel free to ask anytime. Happy farming!",
+        "sw": "Karibu! Uliza wakati wowote. Kilimo cha furaha!"
     },
     "bye": {
-        "en": "Goodbye! Come back anytime you need farming advice. 🌾",
-        "sw": "Kwaheri! Rudi wakati wowote unapohitaji ushauri wa kilimo. 🌾"
+        "en": "Goodbye! Come back anytime you need farming advice.",
+        "sw": "Kwaheri! Rudi wakati wowote unapohitaji ushauri wa kilimo."
     }
 }
 

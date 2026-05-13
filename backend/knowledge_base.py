@@ -12,18 +12,19 @@ Features:
 import json
 import re
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass
 from datetime import datetime
-import numpy as np
+from dataclasses import dataclass
 from config import logger
 
 # Try to import sentence-transformers for embeddings
 try:
     from sentence_transformers import SentenceTransformer
+    import numpy as np
 
     EMBEDDINGS_AVAILABLE = True
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
+    np = None
     logger.warning(
         "sentence-transformers not installed. Using keyword search fallback."
     )
@@ -902,6 +903,9 @@ class KnowledgeBase:
         self, query: str, top_k: int, threshold: float
     ) -> List[Tuple[KnowledgeFact, float]]:
         """Search using vector embeddings."""
+        if not EMBEDDINGS_AVAILABLE or np is None:
+            return []
+        
         query_embedding = self.model.encode([query])[0]
 
         results = []

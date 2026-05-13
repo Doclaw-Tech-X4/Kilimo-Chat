@@ -11,8 +11,8 @@ import sqlite3
 import uuid
 import json
 import logging
+import os
 from datetime import datetime
-from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass
@@ -20,8 +20,8 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 # Database path
-DB_PATH = Path("data/kilimochat.db")
-DB_PATH.parent.mkdir(exist_ok=True)
+DB_PATH = os.path.join("data", "kilimochat.db")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 @dataclass

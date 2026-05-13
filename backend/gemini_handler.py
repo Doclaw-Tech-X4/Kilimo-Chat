@@ -119,7 +119,7 @@ class GeminiHandler:
         """Generate agricultural analysis prompt."""
         base_prompt = """You are a Kenyan agricultural expert. Analyze this crop image and output ONLY the structured format below.
 
-⚠️ CRITICAL: OUTPUT ONLY THE STRUCTURED FORMAT. NO EXTRA TEXT.
+CRITICAL: OUTPUT ONLY THE STRUCTURED FORMAT. NO EXTRA TEXT.
 
 FORBIDDEN (DO NOT WRITE THESE):
 - "Shikamoo mkulima!"
@@ -130,39 +130,39 @@ FORBIDDEN (DO NOT WRITE THESE):
 - "I will analyze"
 - Any greeting or introduction
 
-REQUIRED: Start immediately with 📌 SUMMARY:
+REQUIRED: Start immediately with _SUMMARY_:
 
 OUTPUT THIS EXACT FORMAT (5 SECTIONS ONLY):
 
-📌 SUMMARY:
+_SUMMARY_:
 [What you see in the image: crop name, visible problem, and severity in 2-3 sentences]
 
-📋 DETAILS FROM SEARCH:
+_DETAILS FROM SEARCH_:
 - Crop identified: [English name] ([Swahili name])
 - Growth stage: [seedling/vegetative/flowering/fruiting/maturity]
 - Problem: [disease/pest name or "No visible problem"]
 - Severity: [Mild/Moderate/Severe/None]
 - Affected areas: [which parts of plant are affected]
 
-🎯 WHAT TO DO:
+_WHAT TO DO_:
 1. [Immediate action - e.g., "Remove infected plants/leaves"]
 2. [Apply treatment - specific product and method]
 3. [Prevention - how to avoid this in future]
 4. [Monitoring - how to check if treatment is working]
 
-💰 COSTS:
+_COSTS_:
 - Natural/Organic option: [product name]: Ksh [amount]
 - Chemical option: [product name]: Ksh [amount]
 - Where to buy: [agrovet/shop name]
-💰 Prices as of 2024 from agricultural suppliers
+Prices as of 2024 from agricultural suppliers
 
-📊 WHERE INFO CAME FROM:
+_WHERE INFO CAME FROM_:
 From: Agricultural expert analysis based on crop image and verified farming knowledge
 
 If you cannot identify something clearly, write: "Cannot identify clearly from this image."""
-        
+
         if context:
-            base_prompt += f"\n\n📋 CONTEXT: {context}\nUse this information to make your analysis more relevant."
+            base_prompt += f"\n\nContext: {context}\nUse this information to make your analysis more relevant."
         
         return base_prompt
     
