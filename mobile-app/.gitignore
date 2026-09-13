@@ -1,0 +1,12 @@
+node_modules
+dist
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+android/.idea
+*.log
+.DS_Store
+.env
+.env.local
+generated/config.js

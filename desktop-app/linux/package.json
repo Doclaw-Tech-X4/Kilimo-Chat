@@ -1,0 +1,40 @@
+{
+  "name": "kilimochat-desktop-linux",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KilimoChat desktop app for Linux",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "KILIMOCHAT_DEV=true electron .",
+    "build:renderer": "DISABLE_ESLINT_PLUGIN=true npm --prefix ../shared run build && rm -rf renderer-build && cp -R ../shared/build renderer-build",
+    "start": "npm run build:renderer && KILIMOCHAT_DEV=false electron .",
+    "dist": "npm run build:renderer && electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^36.5.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.kilimochat.desktop",
+    "productName": "KilimoChat",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer-build/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "artifactName": "KilimoChat-${version}-${arch}.${ext}"
+    }
+  },
+  "allowScripts": {
+    "electron@36.9.5": true
+  }
+}

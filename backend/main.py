@@ -13,6 +13,8 @@ Run with: uvicorn main:app --reload --port 8000
 
 import os
 import sys
+import re
+import base64
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -71,9 +73,13 @@ except Exception as e:
     )
     USING_MONGODB = False
 from language_utils import detect_language, validate_response_language
-from search_handler import search_and_get_context
+from search_handler import search_and_get_context, search_market_prices
 from ai_handler import get_ai_response, check_quick_response, get_ai_response_streaming
-from voice_handler import process_voice_message, cleanup_old_voice_files as cleanup_voice
+from voice_handler import (
+    process_voice_message,
+    cleanup_old_voice_files as cleanup_voice,
+    transcribe_audio_with_whisper,
+)
 from utils.messaging import send_long_whatsapp_message
 from response_formatter import polish_whatsapp_message
 
@@ -918,28 +924,46 @@ async def transcribe_voice(request: Request):
     Accepts base64 encoded audio or URL.
     """
     try:
-        data = await request.json()
-        audio_data = data.get("audio")  # base64 encoded
-        audio_url = data.get("audio_url")
-        user_id = data.get("user_id", "web_user")
-        
-        if not audio_data and not audio_url:
+        content_type = request.headers.get("content-type", "")
+        audio_content = None
+        filename = "voice_transcription.webm"
+        user_id = "web_user"
+
+        if content_type.startswith("multipart/form-data"):
+            form = await request.form()
+            upload = form.get("audio")
+            user_id = str(form.get("user_id", user_id))
+            if upload is not None and hasattr(upload, "read"):
+                audio_content = await upload.read()
+                filename = getattr(upload, "filename", None) or filename
+        else:
+            data = await request.json()
+            audio_data = data.get("audio")
+            user_id = data.get("user_id", user_id)
+            if audio_data:
+                if "," in audio_data:
+                    audio_data = audio_data.split(",", 1)[1]
+                audio_content = base64.b64decode(audio_data)
+
+        if not audio_content:
             return JSONResponse(
                 status_code=400,
                 content={"error": "No audio data provided"}
             )
-        
-        # For now, return a mock response or use existing transcription logic
-        # In production, this would decode base64, save, and transcribe
-        
-        # Get user language preference
+
+        suffix = Path(filename).suffix.lower() or ".webm"
+        temp_file = UPLOADS_DIR / f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}{suffix}"
+        temp_file.write_bytes(audio_content)
+        transcription = transcribe_audio_with_whisper(temp_file)
+        if not transcription:
+            return JSONResponse(status_code=422, content={"success": False, "error": "Audio could not be transcribed"})
+
         user_lang = get_user_language(user_id)
-        
         return {
             "success": True,
-            "transcription": "[Voice message received - transcription placeholder]",
+            "transcription": transcription,
             "detected_language": user_lang,
-            "message": "Voice received and will be processed"
+            "message": "Voice transcribed successfully"
         }
         
     except Exception as e:
@@ -1152,48 +1176,62 @@ async def process_voice_message_api(
             )
         
         # Save temporary audio file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_file = UPLOADS_DIR / f"web_voice_{timestamp}.webm"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        extension = ".webm"
+        if audio.content_type and "mp4" in audio.content_type:
+            extension = ".mp4"
+        elif audio.content_type and "wav" in audio.content_type:
+            extension = ".wav"
+        temp_file = UPLOADS_DIR / f"web_voice_{timestamp}{extension}"
         
         with open(temp_file, "wb") as f:
             f.write(audio_content)
         
         logger.info(f"Voice message received from {user_id}: {temp_file}")
         
-        # For now, return a placeholder response
-        # In production, you would:
-        # 1. Transcribe using Groq Whisper (via voice_handler)
-        # 2. Get AI response
-        # 3. Optionally generate TTS response
-        
         # Get user language preference
         user_lang = get_user_language(user_id)
-        
-        # Placeholder: Simulate processing
-        # In production, replace with actual voice_handler.process_voice_message()
-        simulated_transcription = "[Voice message - processing simulation]"
+
+        transcription = transcribe_audio_with_whisper(temp_file)
+        if not transcription:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "success": False,
+                    "message": "Audio was received, but speech could not be transcribed. Check the microphone recording and try again.",
+                },
+            )
         
         # Get AI response
         ai_response = get_ai_response(
-            user_message=simulated_transcription,
+            user_message=transcription,
             user_phone=user_id,
             target_language=user_lang,
-            use_search=False
+            use_search=True
         )
         
         # Save to database
         save_message(
             user_phone=user_id,
             message_type="voice",
-            content=f"[Voice: {temp_file}]",
+            content=f"[Voice: {temp_file}] {transcription}",
             ai_response=ai_response
         )
+
+        audio_response = None
+        try:
+            from tts_handler import generate_speech
+            audio_response = generate_speech(ai_response, user_lang)
+        except Exception as tts_error:
+            logger.warning(f"Voice response TTS unavailable: {tts_error}")
         
         return {
             "success": True,
-            "transcription": simulated_transcription,
+            "transcription": transcription,
             "message": ai_response,
             "detected_language": user_lang,
+            "audio_url": audio_response.get("audio_url") if audio_response else None,
+            "use_browser_tts": not bool(audio_response and audio_response.get("audio_url")),
         }
         
     except Exception as e:
@@ -2314,48 +2352,43 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
     return round(R * c, 1)
 
-# Generate realistic price history
-def generate_price_history(base_price, years=5):
-    """Generate realistic 5-year price history with trends."""
-    import random
-    from datetime import datetime
-    
-    current_year = datetime.now().year
-    history = []
-    
-    # Seed for consistent but varied prices
-    trend = random.choice(['up', 'down', 'volatile', 'stable'])
-    
-    for i in range(years):
-        year = current_year - (years - 1 - i)
-        
-        if trend == 'up':
-            variation = random.uniform(-5, 15)
-        elif trend == 'down':
-            variation = random.uniform(-15, 5)
-        elif trend == 'volatile':
-            variation = random.uniform(-25, 25)
-        else:  # stable
-            variation = random.uniform(-8, 8)
-        
-        # Add some year-to-year inflation
-        inflation = (years - i) * 2
-        
-        price = max(10, int(base_price + variation + inflation))
-        history.append({
-            "year": str(year),
-            "price": price,
-            "trend": trend
-        })
-    
-    return history
+def extract_live_market_prices(results):
+    """Extract explicitly published KSh/KES prices without inventing values."""
+    price_pattern = re.compile(
+        r"(?:ksh|kes|kshs|shs?)\s*([0-9][0-9,]*(?:\.\d+)?)|"
+        r"([0-9][0-9,]*(?:\.\d+)?)\s*(?:ksh|kes|per\s*(?:kg|kilo))",
+        re.IGNORECASE,
+    )
+    points = []
+    sources = []
+    for result in results:
+        text = f"{result.title} {result.snippet}"
+        matches = price_pattern.findall(text)
+        values = []
+        for match in matches:
+            raw = next((value for value in match if value), "").replace(",", "")
+            try:
+                value = round(float(raw), 2)
+            except ValueError:
+                continue
+            if 5 <= value <= 100000:
+                values.append(value)
+        if values:
+            sources.append({"title": result.title, "url": result.url})
+            year_match = re.search(r"\b(20\d{2})\b", text)
+            points.append({
+                "year": year_match.group(1) if year_match else None,
+                "price": values[0],
+                "source": result.url,
+            })
+    return points, sources
 
 # Market search request model
 from pydantic import BaseModel
 
 class MarketSearchRequest(BaseModel):
     crop: str
-    location: Optional[Dict[str, float]] = None
+    location: Optional[Dict[str, Any]] = None
     language: str = "en"
 
 @app.post("/api/market/search")
@@ -2382,29 +2415,46 @@ async def search_crop_market(request: MarketSearchRequest):
                 crop_data = data
                 break
         
-        # If not found, use the query as-is with defaults
+        # Keep unknown crops searchable, but never fabricate a price for them.
         if not crop_data:
             crop_data = {
                 "name": crop_query.title(),
                 "swahili_name": crop_query.title(),
                 "category": "General",
-                "base_price": 80,
                 "unit": "kg",
                 "image_keywords": f"{crop_query},agriculture",
             }
         
-        # Generate price history
-        price_history = generate_price_history(crop_data["base_price"])
-        current_price = price_history[-1]["price"]
-        previous_price = price_history[-2]["price"]
+        live_results = search_market_prices(crop_query)
+        price_history, sources = extract_live_market_prices(live_results)
+        if not price_history:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": False,
+                    "data_available": False,
+                    "message": "No current published market price was found. The live market source returned no usable price for this search; try another crop or region.",
+                    "sources": [{"title": result.title, "url": result.url} for result in live_results],
+                },
+            )
+
+        current_price = price_history[0]["price"]
+        previous_price = price_history[1]["price"] if len(price_history) > 1 else current_price
         price_change = round(((current_price - previous_price) / previous_price) * 100, 1)
         
         # Calculate distances and sort dealers
         dealers = KENYA_DEALERS.copy()
         
         if user_location and "lat" in user_location and "lon" in user_location:
-            user_lat = user_location["lat"]
-            user_lon = user_location["lon"]
+            try:
+                user_lat = float(user_location["lat"])
+                user_lon = float(user_location["lon"])
+            except (TypeError, ValueError):
+                user_lat = user_lon = None
+        else:
+            user_lat = user_lon = None
+
+        if user_lat is not None and user_lon is not None:
             
             for dealer in dealers:
                 dealer["distance"] = calculate_distance(
@@ -2415,10 +2465,9 @@ async def search_crop_market(request: MarketSearchRequest):
             # Sort by distance
             dealers.sort(key=lambda x: x.get("distance", 999))
         else:
-            # Random distances if no user location
-            import random
+            # Distance is unknown without valid device coordinates; do not fabricate it.
             for dealer in dealers:
-                dealer["distance"] = random.randint(10, 500)
+                dealer["distance"] = None
             dealers.sort(key=lambda x: x.get("distance", 999))
         
         # Limit to top 6 dealers
@@ -2445,6 +2494,13 @@ async def search_crop_market(request: MarketSearchRequest):
                 f"Dealers are available across all regions of Kenya. "
                 f"{crop_name} is an important crop for many farmers with strong domestic and export markets."
             )
+
+        market_audio = None
+        try:
+            from tts_handler import generate_speech
+            market_audio = generate_speech(analysis, language)
+        except Exception as tts_error:
+            logger.warning(f"Market TTS unavailable: {tts_error}")
         
         # Prepare response
         response = {
@@ -2456,6 +2512,12 @@ async def search_crop_market(request: MarketSearchRequest):
             "price_trend": "up" if price_change > 0 else "down" if price_change < 0 else "stable",
             "price_change": abs(price_change),
             "price_history": price_history,
+            "data_source": "live web search",
+            "sources": sources,
+            "retrieved_at": datetime.utcnow().isoformat() + "Z",
+            "history_is_published": len(price_history) > 1,
+            "audio_url": market_audio.get("audio_url") if market_audio else None,
+            "use_browser_tts": not bool(market_audio and market_audio.get("audio_url")),
             "dealers": dealers,
             "analysis": analysis,
             "image_url": f"https://source.unsplash.com/400x400/?{crop_data['image_keywords']}",

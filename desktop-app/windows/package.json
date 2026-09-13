@@ -1,0 +1,25 @@
+{
+  "name": "kilimochat-desktop-windows",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KilimoChat desktop app for Windows",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "set KILIMOCHAT_DEV=true&& electron .",
+    "build:renderer": "set DISABLE_ESLINT_PLUGIN=true&& npm --prefix ../shared run build && if exist renderer-build rmdir /s /q renderer-build && xcopy /e /i /y ..\\shared\\build renderer-build",
+    "start": "npm run build:renderer && set KILIMOCHAT_DEV=false&& electron .",
+    "dist": "npm run build:renderer && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^36.5.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.kilimochat.desktop",
+    "productName": "KilimoChat",
+    "directories": { "output": "release" },
+    "files": ["electron/**/*", "renderer-build/**/*", "package.json"],
+    "win": { "target": ["nsis", "portable"], "artifactName": "KilimoChat-${version}-${arch}.${ext}" },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true }
+  }
+}

@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --primary: #0f7e39;
+    --primary-dark: #0d6b32;
+    --primary-light: #148d42;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', 'Lexend', system-ui, Roboto, sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+@layer components {
+  /* App shell */
+  .app-shell {
+    @apply mx-auto flex min-h-dvh w-full flex-col bg-page;
+    max-width: 100%;
+  }
+
+  .screen {
+    @apply flex-1 px-5 pb-28;
+  }
+
+  @media (min-width: 480px) {
+    .app-shell {
+      max-width: 480px;
+      border-left: 1px solid #e6e6e6;
+      border-right: 1px solid #e6e6e6;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  /* Header */
+  .app-header {
+    @apply sticky top-0 z-40 border-b border-black/5 bg-page/90 backdrop-blur-md;
+    padding-top: var(--safe-top);
+  }
+
+  .app-header-inner {
+    @apply flex items-center justify-between px-5 py-3;
+  }
+
+  /* Surfaces */
+  .card {
+    @apply rounded-2xl border border-black/[0.05] bg-white shadow-card;
+  }
+
+  .card-pad {
+    @apply p-4;
+  }
+
+  .grad-green {
+    background: linear-gradient(135deg, #148d42 0%, #0f7e39 50%, #0d6b32 100%);
+  }
+
+  .grad-hero {
+    background: linear-gradient(135deg, #148d42 0%, #0f7e39 55%, #0b5a2a 100%);
+  }
+
+  .glass {
+    @apply border border-white/20 bg-white/90 backdrop-blur-xl;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-[15px] font-semibold transition-all duration-200 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn grad-green text-white shadow-lifted;
+  }
+
+  .btn-ghost {
+    @apply btn border border-black/10 bg-white text-ink;
+  }
+
+  .btn-soft {
+    @apply btn bg-primary-soft text-primary;
+  }
+
+  /* Forms */
+  .field-label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink-soft;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-black/10 bg-white px-4 py-3.5 text-[16px] text-ink outline-none transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10;
+  }
+
+  .field-pad {
+    @apply px-4 py-3 text-[16px] text-ink outline-none;
+  }
+
+  /* Chips */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium;
+  }
+
+  /* Dock nav */
+  .dock-nav {
+    position: fixed;
+    bottom: calc(10px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: min(92%, 440px);
+  }
+
+  .dock-item {
+    @apply flex min-w-[52px] flex-col items-center justify-center rounded-2xl py-2 text-ink-faint transition-all duration-200;
+  }
+
+  /* Branding */
+  .brand-mark {
+    @apply flex h-10 w-10 items-center justify-center rounded-2xl grad-green text-white shadow-lifted;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--safe-bottom);
+  }
+
+  .safe-top {
+    padding-top: var(--safe-top);
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-black/5;
+  }
+
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 animate-shimmer;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.7),
+      transparent
+    );
+    background-size: 200% 100%;
+  }
+}
