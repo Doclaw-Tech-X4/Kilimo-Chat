@@ -38,6 +38,7 @@ from config import (
     MISSING_CONFIG,
     validate_config,
     GEMINI_API_KEY,
+    AI_PAID_TIER_ENABLED,
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
     TWILIO_WHATSAPP_NUMBER,
@@ -85,10 +86,11 @@ from response_formatter import polish_whatsapp_message
 
 # Import Gemini handler for image/video analysis
 try:
-    from gemini_handler import analyze_file, is_gemini_configured
+    from gemini_handler import analyze_file, is_gemini_configured, is_gemini_text_configured
     GEMINI_AVAILABLE = is_gemini_configured()
 except ImportError:
     GEMINI_AVAILABLE = False
+    is_gemini_text_configured = lambda: False
     logger.warning("Gemini handler not available for file analysis")
 
 # Import TTS handler
@@ -177,14 +179,17 @@ async def startup_event():
     kb = get_knowledge_base()
     logger.info(f"✅ Knowledge base ready ({kb.get_stats()['total_facts']} facts)")
     
-    logger.info("✅ AI Service ready (Groq)")
+    if is_gemini_text_configured():
+        logger.info("✅ AI Service ready (Gemini Pro chat, Groq fallback)")
+    else:
+        logger.info("✅ AI Service ready (Groq chat)")
     logger.info("✅ Voice pipeline ready (Whisper)")
     logger.info("✅ Web search ready (DuckDuckGo)")
     logger.info("✅ Language detection ready")
     
     # Log Gemini status
     if GEMINI_AVAILABLE:
-        logger.info("✅ Gemini AI ready for image/video analysis")
+        logger.info("✅ Gemini AI ready for chat and image/video analysis")
     else:
         logger.warning("⚠️  Gemini AI not available - image/video analysis disabled")
     
@@ -258,6 +263,9 @@ async def gemini_status():
     """
     return {
         "gemini_available": GEMINI_AVAILABLE,
+        "gemini_chat_available": is_gemini_text_configured(),
+        "gemini_chat_model": os.getenv("GEMINI_CHAT_MODEL", "gemini-3.1-pro-preview"),
+        "paid_tier_enabled": AI_PAID_TIER_ENABLED,
         "api_key_configured": bool(GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here"),
         "timestamp": datetime.now().isoformat()
     }

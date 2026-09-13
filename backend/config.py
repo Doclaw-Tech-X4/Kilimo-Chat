@@ -10,11 +10,12 @@ from typing import List
 
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
 # Base paths (pathlib.Path for correct ``/`` joining on all platforms)
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load the backend environment regardless of the directory used to start uvicorn.
+load_dotenv(BASE_DIR / ".env")
+
 DATA_DIR = BASE_DIR / "data"
 UPLOADS_DIR = BASE_DIR / "uploads" / "voice"
 LOGS_DIR = BASE_DIR / "logs"
@@ -32,8 +33,11 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238
 # Weather API (OpenWeatherMap)
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
-# Gemini API (Google AI for image/video analysis)
+# Gemini API (Google AI for chat and image/video analysis)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.1-pro-preview")
+GEMINI_FREE_MODEL = os.getenv("GEMINI_FREE_MODEL", "gemini-2.5-flash")
+AI_PAID_TIER_ENABLED = os.getenv("AI_PAID_TIER_ENABLED", "false").lower() in {"1", "true", "yes", "paid"}
 
 # MongoDB Configuration
 MONGODB_URI = os.getenv("MONGODB_URI", "")

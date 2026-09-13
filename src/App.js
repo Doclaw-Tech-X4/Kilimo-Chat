@@ -17,6 +17,7 @@ import RecordPage from './components/RecordPage';
 import WeatherPage from './components/WeatherPage';
 import MarketPage from './components/MarketPage';
 import AdminDashboard from './components/AdminDashboard';
+import MarketingHome from './components/MarketingHome';
 
 function App() {
   return (
@@ -25,11 +26,11 @@ function App() {
         <div className="App">
           <Routes>
             {/* Authentication Routes - Public */}
-            <Route path="/" element={<LoginPage />} />
+            <Route path="/" element={<MarketingHome />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<EmailVerificationPage />} />
-            
+
             {/* Protected App Routes - Require Authentication */}
             <Route path="/home" element={
               <ProtectedRoute>
@@ -71,10 +72,10 @@ function App() {
                 <AdminDashboard />
               </ProtectedRoute>
             } />
-            
+
             {/* OAuth Callback Route */}
             <Route path="/auth/callback" element={<AuthCallback />} />
-            
+
             {/* Default redirect to login */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -87,12 +88,12 @@ function App() {
 // OAuth Callback Component
 function AuthCallback() {
   const [status, setStatus] = React.useState('Processing...');
-  
+
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const success = urlParams.get('success');
-    
+
     if (success === 'true' && token) {
       localStorage.setItem('token', token);
       setStatus('Login successful! Redirecting...');

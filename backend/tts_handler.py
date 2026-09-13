@@ -8,7 +8,7 @@ import re
 import hashlib
 from typing import Dict, Any, Optional
 from pathlib import Path
-from config import logger
+from config import AI_PAID_TIER_ENABLED, logger
 
 # Try to import TTS libraries
 try:
@@ -227,7 +227,7 @@ def generate_speech(text: str, language: str = "en", is_image_analysis: bool = F
         }
     
     # Try ElevenLabs (best human-like voice)
-    if ELEVENLABS_API_KEY:
+    if ELEVENLABS_API_KEY and AI_PAID_TIER_ENABLED:
         try:
             result = _generate_elevenlabs_speech(cleaned_text, language, cache_file)
             if result["success"]:

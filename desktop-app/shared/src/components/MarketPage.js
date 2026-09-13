@@ -273,9 +273,8 @@ const MarketPage = () => {
               type="button"
               onClick={toggleVoiceSearch}
               title={isRecording ? 'Stop recording' : 'Voice search'}
-              className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${
-                isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-[#e6f5e9] text-primary hover:scale-105'
-              }`}
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-[#e6f5e9] text-primary hover:scale-105'
+                }`}
             >
               <Mic className="h-4 w-4" />
             </button>

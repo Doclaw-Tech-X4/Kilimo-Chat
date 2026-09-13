@@ -59,7 +59,10 @@ cp .env.example .env
 # Edit .env with your API keys:
 # - TWILIO_ACCOUNT_SID (from Twilio console)
 # - TWILIO_AUTH_TOKEN (from Twilio console)
-# - GROQ_API_KEY (from groq.com - free tier available)
+# - GROQ_API_KEY (fallback chat and Whisper transcription)
+# - GEMINI_API_KEY (Gemini Pro chat and crop image/video analysis)
+# - GEMINI_CHAT_MODEL=gemini-3.1-pro-preview (optional; falls back to available Gemini models)
+# - AI_PAID_TIER_ENABLED=false (default; keeps unpaid accounts on free-tier AI models)
 ```
 
 ### 4. Run the Server

@@ -321,9 +321,8 @@ const MarketPage = () => {
                         <p className="text-[10.5px] text-white/70">{detectedLanguage === 'sw' ? 'Bei ya Leo' : "Today's Price"}</p>
                         <p className="text-[17px] font-extrabold">Ksh {searchResult.current_price?.toLocaleString()}/kg</p>
                       </div>
-                      <span className={`rounded-lg px-2 py-1 text-[11.5px] font-bold ${
-                        searchResult.price_trend === 'up' ? 'bg-green-400 text-green-900' : searchResult.price_trend === 'down' ? 'bg-red-400 text-red-900' : 'bg-yellow-400 text-yellow-900'
-                      }`}>
+                      <span className={`rounded-lg px-2 py-1 text-[11.5px] font-bold ${searchResult.price_trend === 'up' ? 'bg-green-400 text-green-900' : searchResult.price_trend === 'down' ? 'bg-red-400 text-red-900' : 'bg-yellow-400 text-yellow-900'
+                        }`}>
                         {searchResult.price_change > 0 ? '+' : ''}{searchResult.price_change}%
                       </span>
                     </div>

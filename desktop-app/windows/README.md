@@ -65,3 +65,6 @@ The installer and portable executable are written to `release/`. Build Windows a
 ## Backend connection
 
 The renderer keeps the existing `REACT_APP_API_URL` contract. Start the same backend used by the web and mobile applications before signing in.
+
+AI provider selection is centralized in the backend. When `AI_PAID_TIER_ENABLED=false`, Windows uses
+the same free-tier Gemini/Groq fallback as Linux, mobile, web, and WhatsApp.

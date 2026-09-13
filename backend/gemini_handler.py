@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 import logging
 
-from config import GEMINI_API_KEY, logger
+from config import AI_PAID_TIER_ENABLED, GEMINI_API_KEY, GEMINI_CHAT_MODEL, GEMINI_FREE_MODEL, logger
 
 # Try to import new google.genai SDK
 try:
@@ -30,6 +30,7 @@ class GeminiHandler:
         self.is_configured = False
         self.client = None
         self.model_name = None
+        self.chat_model_name = None
         
         if not GEMINI_AVAILABLE:
             logger.error("google-genai not installed. Run: pip install google-genai")
@@ -48,37 +49,37 @@ class GeminiHandler:
             logger.info(f"Available Gemini models: {available_models}")
             
             # Priority: newest first
-            preferred_models = [
-                'gemini-2.5-flash',
-                'gemini-2.0-flash',
-                'gemini-2.0-flash-001',
-                'gemini-1.5-flash',
-                'gemini-1.5-flash-001',
-
-   
-                'gemini-3.1-pro-preview',   
-                'gemini-2.5-pro',           
-                'gemini-1.5-pro',          
-                'gemini-1.5-pro-001',      
-
-
-                'gemini-3.7-flash',         
-                'gemini-3.5-flash',         
-                'gemini-3-flash-preview',   
-                'gemini-2.5-flash-lite',    
-                'gemini-3.5-flash-lite',    
-
-                'gemini-3-pro-image',       
-                'gemini-3.1-flash-image'    
-            ]
+            if AI_PAID_TIER_ENABLED:
+                preferred_models = [
+                    'gemini-3.1-pro-preview',
+                    'gemini-2.5-pro',
+                    'gemini-2.5-flash',
+                    'gemini-2.0-flash',
+                    'gemini-2.0-flash-001',
+                    'gemini-1.5-pro',
+                    'gemini-1.5-pro-001',
+                    'gemini-1.5-flash',
+                    'gemini-1.5-flash-001',
+                ]
+            else:
+                preferred_models = [
+                    GEMINI_FREE_MODEL,
+                    'gemini-2.5-flash',
+                    'gemini-2.0-flash',
+                    'gemini-1.5-flash',
+                ]
             
             # Find first working model
             for model in preferred_models:
-                if model in available_models:
-                    self.model_name = model
+                matching_model = next(
+                    (available for available in available_models if available == model or available.rsplit('/', 1)[-1] == model),
+                    None,
+                )
+                if matching_model:
+                    self.model_name = matching_model
                     self.is_configured = True
-                    logger.info(f"✅ Gemini AI configured with model: {model}")
-                    return
+                    logger.info(f"✅ Gemini AI configured with model: {matching_model}")
+                    break
             
             # If none preferred found, use first available
             if available_models:
@@ -87,6 +88,10 @@ class GeminiHandler:
                 logger.info(f"✅ Gemini AI configured with fallback model: {self.model_name}")
             else:
                 logger.error("No Gemini models available with this API key")
+
+            self.chat_model_name = self._select_chat_model(available_models)
+            if self.chat_model_name:
+                logger.info(f"✅ Gemini chat configured with model: {self.chat_model_name}")
                 
         except Exception as e:
             logger.error(f"Failed to configure Gemini: {e}")
@@ -104,6 +109,76 @@ class GeminiHandler:
             logger.warning(f"Could not list models: {e}")
             # Return common model names as fallback
             return ['gemini-2.0-flash', 'gemini-2.5-flash']
+
+    def _select_chat_model(self, available_models: List[str]) -> Optional[str]:
+        """Select a Pro-first text model while accepting SDK name prefixes."""
+        if not AI_PAID_TIER_ENABLED:
+            preferred = [GEMINI_FREE_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
+        else:
+            preferred = [
+                GEMINI_CHAT_MODEL,
+                'gemini-3.1-pro-preview',
+                'gemini-2.5-pro',
+                'gemini-2.0-pro',
+                'gemini-1.5-pro',
+                'gemini-2.5-flash',
+                'gemini-2.0-flash',
+            ]
+        for candidate in preferred:
+            for available in available_models:
+                if available == candidate or available.rsplit('/', 1)[-1] == candidate:
+                    return available
+        return available_models[0] if available_models else None
+
+    def generate_text(self, prompt: str, system_instruction: str = "", temperature: float = 0.7) -> Dict[str, Any]:
+        """Generate a text response for chat using Gemini Pro-first with fallback models."""
+        if not self.client or not self.chat_model_name:
+            return {"success": False, "error": "Gemini text generation is not configured."}
+
+        candidates = [self.chat_model_name]
+        if AI_PAID_TIER_ENABLED:
+            candidates += [GEMINI_CHAT_MODEL, 'gemini-3.1-pro-preview', 'gemini-2.5-pro']
+        candidates += [GEMINI_FREE_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
+        seen = set()
+        for model in candidates:
+            if model in seen:
+                continue
+            seen.add(model)
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction or None,
+                        temperature=temperature,
+                        max_output_tokens=2048,
+                    ),
+                )
+                text = (response.text or '').strip()
+                if text:
+                    return {"success": True, "text": text, "model_used": model}
+            except Exception as error:
+                logger.warning(f"Gemini text model {model} failed: {error}")
+
+        return {"success": False, "error": "Gemini text generation failed for all configured models."}
+
+    def stream_text(self, prompt: str, system_instruction: str = "", temperature: float = 0.7):
+        """Yield Gemini text chunks for streaming chat responses."""
+        if not self.client or not self.chat_model_name:
+            raise RuntimeError("Gemini text generation is not configured")
+        response = self.client.models.generate_content_stream(
+            model=self.chat_model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction or None,
+                temperature=temperature,
+                max_output_tokens=2048,
+            ),
+        )
+        for chunk in response:
+            text = getattr(chunk, "text", None)
+            if text:
+                yield text
     
     def _encode_file(self, file_path: str) -> Dict[str, Any]:
         """Read file and return bytes + mime type."""
@@ -424,3 +499,12 @@ def analyze_file(file_path: str, context: str = "") -> Dict[str, Any]:
 
 def is_gemini_configured() -> bool:
     return gemini_handler.is_configured
+
+def generate_text(prompt: str, system_instruction: str = "", temperature: float = 0.7) -> Dict[str, Any]:
+    return gemini_handler.generate_text(prompt, system_instruction, temperature)
+
+def is_gemini_text_configured() -> bool:
+    return bool(gemini_handler.client and gemini_handler.chat_model_name)
+
+def stream_text(prompt: str, system_instruction: str = "", temperature: float = 0.7):
+    return gemini_handler.stream_text(prompt, system_instruction, temperature)

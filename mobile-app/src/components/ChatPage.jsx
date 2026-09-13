@@ -466,18 +466,17 @@ const ChatPage = () => {
             <button
               {...(hasMediaRecorder
                 ? {
-                    onMouseDown: startRecording,
-                    onMouseUp: stopRecording,
-                    onMouseLeave: stopRecording,
-                    onTouchStart: startRecording,
-                    onTouchEnd: stopRecording,
-                    onTouchMove: handleTouchMove,
-                  }
+                  onMouseDown: startRecording,
+                  onMouseUp: stopRecording,
+                  onMouseLeave: stopRecording,
+                  onTouchStart: startRecording,
+                  onTouchEnd: stopRecording,
+                  onTouchMove: handleTouchMove,
+                }
                 : { onClick: startRecording })}
               disabled={loading}
-              className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-lifted active:scale-95 ${
-                recording ? 'bg-red-500' : 'grad-green'
-              } ${recording ? 'animate-pulse' : ''}`}
+              className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-lifted active:scale-95 ${recording ? 'bg-red-500' : 'grad-green'
+                } ${recording ? 'animate-pulse' : ''}`}
               aria-label="Record voice"
             >
               {recording && <span className="absolute inset-0 animate-pulse-ring rounded-full bg-red-500/60" />}

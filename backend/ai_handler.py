@@ -27,6 +27,13 @@ from language_utils import translate_response
 from database_auth import get_user_profile
 from response_formatter import format_response, polish_whatsapp_message
 
+try:
+    from gemini_handler import generate_text as generate_gemini_text, stream_text as stream_gemini_text, is_gemini_text_configured
+except ImportError:
+    generate_gemini_text = None
+    stream_gemini_text = None
+    is_gemini_text_configured = lambda: False
+
 # RAG threshold - minimum confidence to use knowledge base answer
 RAG_CONFIDENCE_THRESHOLD = 0.75
 
@@ -544,6 +551,24 @@ Please answer using both your knowledge, the web search results, and any verifie
             except Exception as e:
                 logger.warning(f"Failed to save search log: {e}")
     
+    # Prefer Gemini Pro for chat when configured; keep Groq as a fallback.
+    if generate_gemini_text and is_gemini_text_configured():
+        gemini_result = generate_gemini_text(
+            messages[1]["content"],
+            system_instruction=system_prompt,
+            temperature=0.7,
+        )
+        if gemini_result.get("success"):
+            ai_response = gemini_result["text"]
+            logger.info(f"Chat response generated with Gemini ({gemini_result.get('model_used')})")
+            return finalize_chat_response_text(
+                ai_response,
+                user_message=user_message,
+                target_language=target_language,
+                use_search=use_search,
+            )
+        logger.warning("Gemini chat failed; falling back to Groq")
+
     # Call Groq API with retries
     for attempt in range(MAX_RETRIES):
         try:
@@ -721,6 +746,18 @@ Please answer using both your knowledge, the web search results, and any verifie
             except Exception as e:
                 logger.warning(f"Failed to save search log: {e}")
     
+    if stream_gemini_text and is_gemini_text_configured():
+        try:
+            for text_chunk in stream_gemini_text(
+                messages[1]["content"],
+                system_instruction=system_prompt,
+                temperature=0.7,
+            ):
+                yield text_chunk
+            return
+        except Exception as e:
+            logger.warning(f"Gemini streaming failed; falling back to Groq: {e}")
+
     # Stream from Groq API
     try:
         response = groq_client.chat.completions.create(

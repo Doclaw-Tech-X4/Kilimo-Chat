@@ -31,6 +31,9 @@ At build time, `vite.config.js` uses `VITE_API_URL` when provided. Otherwise it 
 LAN IPv4 and bakes it in as `__API_URL__`. The app also probes Android emulator and USB reverse-
 debugging addresses automatically.
 
+AI provider billing is enforced by the backend for every client. Unpaid accounts use the configured
+free-tier Gemini/Groq fallback automatically; the mobile app does not need a separate provider key.
+
 - To override (e.g. a different machine, or using the current IP explicitly):
   `VITE_API_URL=http://192.168.0.109:8000 npm run build`
 - If your IP ever changes, rebuild + `npx cap sync android` + rebuild the APK.

@@ -65,3 +65,6 @@ The AppImage and Debian package are written to `release/`.
 ## Backend connection
 
 The renderer keeps the existing `REACT_APP_API_URL` contract. Start the same backend used by the web and mobile applications before signing in.
+
+AI provider selection is centralized in the backend. When `AI_PAID_TIER_ENABLED=false`, Linux uses
+the same free-tier Gemini/Groq fallback as Windows, mobile, web, and WhatsApp.
