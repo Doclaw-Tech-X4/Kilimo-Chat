@@ -17,6 +17,7 @@ import {
   FileAudio,
   FileVideo,
   X,
+  MessageCircle,
 } from 'lucide-react';
 import {
   API_BASE_URL,
@@ -69,7 +70,7 @@ const ChatPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [playingId, setPlayingId] = useState(null);
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true);
   const [sessionId, setSessionId] = useState('');
   const [currentWeather, setCurrentWeather] = useState(null);
 
@@ -127,7 +128,7 @@ const ChatPage = () => {
   }, [messages, isLoading]);
 
   const speakStreamText = useCallback(
-    (fullText) => {
+    (fullText, language = 'en') => {
       if (
         !autoSpeak ||
         typeof window.speechSynthesis === 'undefined' ||
@@ -139,14 +140,45 @@ const ChatPage = () => {
       if (!sentences) return;
       const sentence = sentences[sentences.length - 1]?.trim();
       if (!sentence) return;
+      const langCode = language === 'sw' ? 'sw-KE' : 'en-US';
       const utterance = new SpeechSynthesisUtterance(sentence);
-      utterance.lang = 'en-US';
+      utterance.lang = langCode;
       utterance.rate = 0.95;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
     },
     [autoSpeak, playingId]
   );
+
+  const renderCleanBotText = (text) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return (
+      <div className="space-y-2 text-sm leading-relaxed text-[#1f2937]">
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) return <div key={idx} className="h-1.5" />;
+          if (trimmed.startsWith('_') && trimmed.endsWith('_')) {
+            const heading = trimmed.replace(/_/g, '').toUpperCase();
+            return (
+              <div key={idx} className="mt-3 mb-1 font-bold text-xs uppercase tracking-wider text-primary border-b border-primary/20 pb-1">
+                {heading}
+              </div>
+            );
+          }
+          if (trimmed.startsWith('•') || trimmed.startsWith('-') || /^\d+\./.test(trimmed)) {
+            return (
+              <div key={idx} className="flex items-start gap-2 pl-1 my-1">
+                <span className="text-primary font-bold mt-0.5">•</span>
+                <span className="flex-1 text-[#2d3748]">{trimmed.replace(/^[•\-\*]\s*|\d+\.\s*/, '')}</span>
+              </div>
+            );
+          }
+          return <p key={idx} className="my-1 text-[#2d3748]">{trimmed}</p>;
+        })}
+      </div>
+    );
+  };
 
   const handleSend = async (textOverride) => {
     const text = (textOverride || inputMessage).trim();
@@ -229,7 +261,7 @@ const ChatPage = () => {
                     : m
                 )
               );
-              speakStreamText(data.full_text);
+              speakStreamText(data.full_text, data.language || 'en');
             } else if (data.type === 'error') {
               setMessages((prev) =>
                 prev.map((m) =>
@@ -521,7 +553,7 @@ const ChatPage = () => {
                   </div>
                 ) : null}
 
-                {msg.text && <div className="break-words">{msg.text}</div>}
+                {msg.text && (msg.type === 'bot' ? renderCleanBotText(msg.text) : <div className="break-words">{msg.text}</div>)}
 
                 <div className="mt-1.5 flex items-center gap-2">
                   <span
@@ -602,6 +634,16 @@ const ChatPage = () => {
               {chip.label}
             </button>
           ))}
+          <a
+            href="https://wa.me/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366]/10 px-3 py-1.5 text-xs font-bold text-[#25D366] hover:bg-[#25D366]/20 transition-colors"
+            title="Connect directly on WhatsApp"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            WhatsApp
+          </a>
           <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-[#8a938c]">
             <input
               type="checkbox"

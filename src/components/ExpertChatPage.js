@@ -42,7 +42,7 @@ const ExpertChatPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(null);
-  const [autoSpeak, setAutoSpeak] = useState(false); // Audio only plays when user clicks speak button
+  const [autoSpeak, setAutoSpeak] = useState(true); // Auto-speak enabled for real-time talk back
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [userLocation, setUserLocation] = useState(null);
   const [currentWeather, setCurrentWeather] = useState(null);

@@ -142,7 +142,8 @@ const ChatPage = () => {
               setMessages((p) => p.map((m) => (m.id === botId ? { ...m, text: full, detectedLanguage: lang } : m)))
             } else if (data.type === 'done') {
               const display = typeof data.full_text === 'string' && data.full_text.trim() ? data.full_text : full
-              setMessages((p) => p.map((m) => (m.id === botId ? { ...m, text: display, isStreaming: false } : m)))
+              setMessages((p) => p.map((m) => (m.id === botId ? { ...m, text: display, isStreaming: false, detectedLanguage: data.language || lang } : m)))
+              speakText(display, data.language || lang, botId)
             }
           } catch (e) {
             console.error('SSE parse error:', e)
@@ -326,9 +327,19 @@ const ChatPage = () => {
               </p>
             </div>
           </div>
-          <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-card" aria-label="More">
-            <MoreVertical className="h-[18px] w-[18px]" />
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://wa.me/"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 rounded-full bg-[#25D366]/15 px-3 py-1.5 text-xs font-bold text-[#25D366]"
+            >
+              WhatsApp
+            </a>
+            <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-card" aria-label="More">
+              <MoreVertical className="h-[18px] w-[18px]" />
+            </button>
+          </div>
         </div>
       </header>
 

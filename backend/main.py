@@ -59,7 +59,7 @@ try:
         get_db_stats
     )
     USING_MONGODB = True
-    logger.info("✅ Using MongoDB Atlas")
+    logger.info("Using MongoDB Atlas")
 except Exception as e:
     # Fallback to SQLite
     logger.warning(f"MongoDB import failed, using SQLite: {e}")
@@ -98,9 +98,9 @@ try:
     from tts_handler import ELEVENLABS_API_KEY
     TTS_AVAILABLE = bool(ELEVENLABS_API_KEY)
     if TTS_AVAILABLE:
-        logger.info("✅ ElevenLabs TTS configured - human-like voice enabled")
+        logger.info("ElevenLabs TTS configured - human-like voice enabled")
     else:
-        logger.info("ℹ️ ElevenLabs API key not set - using browser TTS fallback")
+        logger.info("ElevenLabs API key not set - using browser TTS fallback")
 except ImportError:
     TTS_AVAILABLE = False
     logger.warning("TTS handler not available")
@@ -113,10 +113,10 @@ try:
     if AUTH_AVAILABLE:
         from auth_routes import auth_router
         from database_auth import init_auth_collections
-        logger.info("✅ Authentication system configured")
+        logger.info("Authentication system configured")
         logger.info(f"Auth router loaded: {auth_router is not None}")
     else:
-        logger.warning("⚠️ JWT_SECRET not set - authentication disabled")
+        logger.warning("JWT_SECRET not set - authentication disabled")
         auth_router = None
 except ImportError as e:
     AUTH_AVAILABLE = False
@@ -157,7 +157,7 @@ else:
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup."""
-    logger.info(f"🚀 {APP_NAME} v{APP_VERSION} starting up...")
+    logger.info(f"{APP_NAME} v{APP_VERSION} starting up...")
     init_database()
     
     # Initialize auth collections if MongoDB is available
@@ -165,35 +165,35 @@ async def startup_event():
         try:
             init_auth_collections()
         except Exception as e:
-            logger.warning(f"⚠️ Failed to initialize auth collections: {e}")
+            logger.warning(f"Failed to initialize auth collections: {e}")
     
     if MISSING_CONFIG:
-        logger.warning(f"⚠️  Missing config: {', '.join(MISSING_CONFIG)}")
+        logger.warning(f"Missing config: {', '.join(MISSING_CONFIG)}")
     else:
-        logger.info("✅ All environment variables configured")
+        logger.info("All environment variables configured")
     
-    logger.info("✅ Database initialized")
+    logger.info("Database initialized")
     
     # Pre-load knowledge base at startup (prevents 6s delay on first request)
     from knowledge_base import get_knowledge_base
     kb = get_knowledge_base()
-    logger.info(f"✅ Knowledge base ready ({kb.get_stats()['total_facts']} facts)")
+    logger.info(f"Knowledge base ready ({kb.get_stats()['total_facts']} facts)")
     
     if is_gemini_text_configured():
-        logger.info("✅ AI Service ready (Gemini Pro chat, Groq fallback)")
+        logger.info("AI Service ready (Gemini Pro chat, Groq fallback)")
     else:
-        logger.info("✅ AI Service ready (Groq chat)")
-    logger.info("✅ Voice pipeline ready (Whisper)")
-    logger.info("✅ Web search ready (DuckDuckGo)")
-    logger.info("✅ Language detection ready")
+        logger.info("AI Service ready (Groq chat)")
+    logger.info("Voice pipeline ready (Whisper)")
+    logger.info("Web search ready (DuckDuckGo)")
+    logger.info("Language detection ready")
     
     # Log Gemini status
     if GEMINI_AVAILABLE:
-        logger.info("✅ Gemini AI ready for chat and image/video analysis")
+        logger.info("Gemini AI ready for chat and image/video analysis")
     else:
-        logger.warning("⚠️  Gemini AI not available - image/video analysis disabled")
+        logger.warning("Gemini AI not available - image/video analysis disabled")
     
-    logger.info("🌾 Ready to help Kenyan farmers!")
+    logger.info("Ready to help Kenyan farmers!")
 
 
 @app.get("/")

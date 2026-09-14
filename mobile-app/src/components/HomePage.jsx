@@ -139,6 +139,27 @@ const HomePage = () => {
           </div>
         </section>
 
+        {/* WhatsApp Direct Banner */}
+        <section className="mt-4 px-5">
+          <a
+            href="https://wa.me/"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between rounded-2xl bg-[#25D366]/10 border border-[#25D366]/30 p-4 transition-all hover:bg-[#25D366]/15 shadow-card"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#25D366] text-white shadow-md">
+                <MessageCircle className="h-6 w-6" />
+              </span>
+              <div>
+                <p className="text-[15px] font-extrabold text-[#1f2937]">WhatsApp Direct</p>
+                <p className="text-[12px] text-[#4b5563]">Chat, send photos & voice notes on WhatsApp</p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-[#25D366]" />
+          </a>
+        </section>
+
         {/* Nurture heading */}
         <section className="mt-6 px-5">
           <h2 className="text-[20px] font-extrabold tracking-tight text-[#196d35]">
