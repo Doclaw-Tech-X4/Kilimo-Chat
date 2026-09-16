@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Cloud, Sun, CloudRain, Wind, Droplets, 
+import {
+  Cloud, Sun, CloudRain, Wind, Droplets,
   MapPin, Sprout, Clock,
   CloudLightning, CloudSnow, Eye, Calendar,
   ArrowLeft
@@ -157,14 +157,14 @@ const WeatherPage = () => {
   // Get farming recommendations based on weather
   const getFarmingRecommendations = (weather) => {
     if (!weather || !weather.weather) return [];
-    
+
     const temp = weather.weather.temperature || 20;
     const humidity = weather.weather.humidity || 60;
     const rainfall = weather.weather.rainfall_last_24h || 0;
     const description = weather.weather.description || '';
-    
+
     const recommendations = [];
-    
+
     // Temperature-based recommendations
     if (temp > 30) {
       recommendations.push({
@@ -181,7 +181,7 @@ const WeatherPage = () => {
         message: 'Cool temperatures. Delay planting of heat-loving crops like tomatoes and maize. Good time for planting cool-season crops like cabbage and peas.'
       });
     }
-    
+
     // Humidity-based recommendations
     if (humidity > 80) {
       recommendations.push({
@@ -191,7 +191,7 @@ const WeatherPage = () => {
         message: 'High humidity increases fungal disease risk. Ensure good field ventilation. Apply preventive fungicides. Avoid overhead irrigation in evening.'
       });
     }
-    
+
     // Rainfall-based recommendations
     if (rainfall > 20) {
       recommendations.push({
@@ -201,7 +201,7 @@ const WeatherPage = () => {
         message: 'Good time for planting. Soil is moist. Consider light weeding once soil is workable. Delay fertilizer application until after rains.'
       });
     }
-    
+
     // Weather description analysis
     if (description.includes('rain') || description.includes('shower')) {
       recommendations.push({
@@ -211,7 +211,7 @@ const WeatherPage = () => {
         message: 'Rainy conditions are ideal for planting. Take advantage for transplanting seedlings or direct seeding. Ensure good drainage.'
       });
     }
-    
+
     if (description.includes('clear') || description.includes('sun')) {
       recommendations.push({
         type: 'info',
@@ -220,17 +220,17 @@ const WeatherPage = () => {
         message: 'Clear weather is ideal for spraying pesticides, harvesting, and drying produce. Take advantage for field maintenance activities.'
       });
     }
-    
+
     return recommendations;
   };
 
   // Get suitable crops for current weather
   const getSuitableCrops = (weather) => {
     if (!weather || !weather.weather) return [];
-    
+
     const temp = weather.weather.temperature || 20;
     const rainfall = weather.weather.annual_rainfall ?? weather.weather.rainfall_last_24h ?? null;
-    
+
     return Object.entries(kenyanCrops).filter(([key, crop]) => {
       const tempMatch = temp >= crop.tempRange.min && temp <= crop.tempRange.max;
       const rainMatch = rainfall === null || (rainfall >= crop.rainfall.min && rainfall <= crop.rainfall.max);
@@ -246,15 +246,16 @@ const WeatherPage = () => {
     const detectLocationAndWeather = async () => {
       try {
         setLoading(true);
-        
+
         // Try to get user location
         try {
           const location = await getUserLocation();
           setUserLocation(location);
-          
+
           // Fetch weather for detected location
           const weather = await getWeatherForLocation(location.lat, location.lon);
           if (weather.success) {
+            setUserLocation({ ...location, city: weather.location, county: weather.county });
             setCurrentWeather(weather);
           } else {
             throw new Error('Weather fetch failed');
@@ -277,7 +278,7 @@ const WeatherPage = () => {
         setLoading(false);
       }
     };
-    
+
     detectLocationAndWeather();
   }, []);
 
@@ -318,7 +319,7 @@ const WeatherPage = () => {
           <div className="p-4 text-center">
             <Cloud className="h-16 w-16 text-[#ccc] mx-auto mb-4" />
             <p className="text-[#666] mb-4">{error}</p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-[#0f7e39] text-white rounded-full text-subtitle font-medium"
             >
@@ -369,7 +370,7 @@ const WeatherPage = () => {
                 {getWeatherIcon(weather?.description)}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/20">
               <div className="text-center">
                 <Droplets className="h-4 w-4 mx-auto mb-1 opacity-80" />
@@ -399,14 +400,13 @@ const WeatherPage = () => {
             </h3>
             <div className="space-y-2">
               {recommendations.map((rec, index) => (
-                <div 
+                <div
                   key={index}
-                  className={`rounded-xl p-3 border ${
-                    rec.type === 'warning' ? 'bg-orange-50 border-orange-200' :
-                    rec.type === 'alert' ? 'bg-red-50 border-red-200' :
-                    rec.type === 'good' ? 'bg-green-50 border-green-200' :
-                    'bg-white border-[#e2e2e2]'
-                  }`}
+                  className={`rounded-xl p-3 border ${rec.type === 'warning' ? 'bg-orange-50 border-orange-200' :
+                      rec.type === 'alert' ? 'bg-red-50 border-red-200' :
+                        rec.type === 'good' ? 'bg-green-50 border-green-200' :
+                          'bg-white border-[#e2e2e2]'
+                    }`}
                 >
                   <div className="flex gap-3">
                     <span className="text-xl">{rec.icon}</span>
@@ -432,11 +432,10 @@ const WeatherPage = () => {
               <button
                 key={crop.id}
                 onClick={() => setSelectedCrop(selectedCrop === crop.id ? null : crop.id)}
-                className={`rounded-xl p-3 text-left border transition-all ${
-                  selectedCrop === crop.id 
-                    ? 'bg-[#0f7e39]/10 border-[#0f7e39]' 
+                className={`rounded-xl p-3 text-left border transition-all ${selectedCrop === crop.id
+                    ? 'bg-[#0f7e39]/10 border-[#0f7e39]'
                     : 'bg-white border-[#e2e2e2] hover:border-[#0f7e39]/50'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{crop.icon}</span>
@@ -466,14 +465,14 @@ const WeatherPage = () => {
                     {kenyanCrops[selectedCrop].name} Calendar
                   </span>
                 </div>
-                <button 
+                <button
                   onClick={() => setSelectedCrop(null)}
                   className="text-white/80 hover:text-white"
                 >
                   ×
                 </button>
               </div>
-              
+
               <div className="p-4">
                 {/* Varieties */}
                 <div className="mb-4">
@@ -565,8 +564,8 @@ const WeatherPage = () => {
                   <div className="flex items-center gap-3">
                     <span className="text-small font-medium text-[#666] w-20">{day}</span>
                     {idx % 3 === 0 ? <CloudRain className="h-5 w-5 text-blue-500" /> :
-                     idx % 3 === 1 ? <Sun className="h-5 w-5 text-yellow-500" /> :
-                     <Cloud className="h-5 w-5 text-gray-400" />}
+                      idx % 3 === 1 ? <Sun className="h-5 w-5 text-yellow-500" /> :
+                        <Cloud className="h-5 w-5 text-gray-400" />}
                     <span className="text-small text-[#333]">
                       {idx % 3 === 0 ? 'Light Rain' : idx % 3 === 1 ? 'Sunny' : 'Partly Cloudy'}
                     </span>
@@ -588,9 +587,9 @@ const WeatherPage = () => {
           </h3>
           <div className="bg-gradient-to-r from-[#f1f8e9] to-[#e8f5e9] rounded-2xl border border-[#c8e6c9] p-4">
             <h4 className="text-subtitle font-semibold text-[#2e7d32] mb-2">
-              Current Season: {new Date().getMonth() >= 3 && new Date().getMonth() <= 5 ? 'Long Rains (March-May)' : 
-                              new Date().getMonth() >= 9 && new Date().getMonth() <= 11 ? 'Short Rains (Oct-Dec)' : 
-                              'Dry Season'}
+              Current Season: {new Date().getMonth() >= 3 && new Date().getMonth() <= 5 ? 'Long Rains (March-May)' :
+                new Date().getMonth() >= 9 && new Date().getMonth() <= 11 ? 'Short Rains (Oct-Dec)' :
+                  'Dry Season'}
             </h4>
             <p className="text-small text-[#555] mb-3">
               Based on Kenyan agricultural calendar and current weather patterns in your region.

@@ -53,6 +53,7 @@ try:
         init_database,
         get_or_create_user,
         get_user_language,
+        update_user_location,
         save_message,
         get_last_interactions,
         get_recent_messages,
@@ -67,6 +68,7 @@ except Exception as e:
         init_database,
         get_or_create_user,
         get_user_language,
+        update_user_location,
         save_message,
         get_last_interactions,
         get_recent_messages,
@@ -1338,27 +1340,28 @@ async def get_weather_by_coords(request: Request):
         lon = data.get("lon")
         user_id = data.get("user_id", "web_user")
         
-        if not lat or not lon:
+        if lat is None or lon is None:
             return JSONResponse(
                 status_code=400,
                 content={"success": False, "error": "Latitude and longitude required"}
             )
         
         # Find nearest Kenyan location
-        from weather_handler import KENYA_LOCATIONS, get_current_weather, format_weather_for_user
-        
-        # Find closest location
-        closest_location = None
-        min_distance = float('inf')
-        
-        for key, loc in KENYA_LOCATIONS.items():
-            distance = ((lat - loc["lat"]) ** 2 + (lon - loc["lon"]) ** 2) ** 0.5
-            if distance < min_distance:
-                min_distance = distance
-                closest_location = key
+        from weather_handler import (
+            get_current_weather,
+            format_weather_for_user,
+            resolve_location_from_coordinates,
+        )
+
+        resolved_location = resolve_location_from_coordinates(lat, lon)
+        if not resolved_location:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Invalid latitude or longitude"}
+            )
         
         # Get weather for closest location
-        weather = get_current_weather(closest_location)
+        weather = get_current_weather(resolved_location["key"])
         
         if weather:
             message = format_weather_for_user(weather, "en")
@@ -1370,10 +1373,14 @@ async def get_weather_by_coords(request: Request):
                 content=f"[Weather request for {weather.location}]",
                 ai_response=message
             )
+            update_user_location(user_id, resolved_location)
             
             return {
                 "success": True,
                 "location": weather.location,
+                "location_key": resolved_location["key"],
+                "county": resolved_location["county"],
+                "coordinates": {"lat": resolved_location["lat"], "lon": resolved_location["lon"]},
                 "weather": {
                     "temperature": weather.temperature,
                     "feels_like": weather.feels_like,

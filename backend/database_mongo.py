@@ -225,6 +225,27 @@ def update_user_language(phone: str, language: str) -> None:
     logger.info(f"Updated user {phone} language to {language}")
 
 
+def update_user_location(phone: str, location: Dict[str, Any]) -> None:
+    """Persist the latest resolved location for a user."""
+    if db is None:
+        return
+
+    get_or_create_user(phone)
+    db.users.update_one(
+        {"phone": phone},
+        {"$set": {
+            "last_location": {
+                "key": location.get("key"),
+                "name": location.get("name"),
+                "county": location.get("county"),
+                "lat": float(location["lat"]),
+                "lon": float(location["lon"]),
+            },
+            "location_updated_at": utc_now(),
+        }}
+    )
+
+
 def save_message(
     user_phone: str,
     message_type: str,

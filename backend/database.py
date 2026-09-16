@@ -92,9 +92,27 @@ def init_database() -> None:
                 phone TEXT PRIMARY KEY,
                 preferred_language TEXT DEFAULT 'en',
                 message_count INTEGER DEFAULT 0,
-                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_location_key TEXT,
+                last_location_name TEXT,
+                last_location_county TEXT,
+                last_latitude REAL,
+                last_longitude REAL,
+                location_updated_at TIMESTAMP
             )
         """)
+
+        existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(users)")}
+        for column, definition in {
+            "last_location_key": "TEXT",
+            "last_location_name": "TEXT",
+            "last_location_county": "TEXT",
+            "last_latitude": "REAL",
+            "last_longitude": "REAL",
+            "location_updated_at": "TIMESTAMP",
+        }.items():
+            if column not in existing_columns:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
         
         # Messages table (chat history)
         cursor.execute("""
@@ -222,6 +240,22 @@ def update_user_language(phone: str, language: str) -> None:
         """, (language, phone))
         conn.commit()
         logger.info(f"Updated user {phone} language to {language}")
+
+
+def update_user_location(phone: str, location: Dict[str, Any]) -> None:
+    """Persist the latest resolved location for a user."""
+    get_or_create_user(phone)
+    with get_db_connection() as conn:
+        conn.execute("""
+            UPDATE users
+            SET last_location_key = ?, last_location_name = ?, last_location_county = ?,
+                last_latitude = ?, last_longitude = ?, location_updated_at = CURRENT_TIMESTAMP
+            WHERE phone = ?
+        """, (
+            location.get("key"), location.get("name"), location.get("county"),
+            float(location["lat"]), float(location["lon"]), phone
+        ))
+        conn.commit()
 
 
 def save_message(

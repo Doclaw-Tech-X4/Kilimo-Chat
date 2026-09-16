@@ -164,7 +164,10 @@ const WeatherPage = () => {
           const location = await getUserLocation()
           setUserLocation(location)
           const weather = await getWeatherForLocation(location.lat, location.lon)
-          if (weather.success) setCurrentWeather(weather)
+          if (weather.success) {
+            setUserLocation({ ...location, city: weather.location, county: weather.county })
+            setCurrentWeather(weather)
+          }
           else throw new Error('Weather fetch failed')
         } catch (locErr) {
           console.log('Location detection failed, using Nairobi fallback:', locErr)
@@ -280,9 +283,8 @@ const WeatherPage = () => {
                 {recommendations.map((rec, i) => (
                   <div
                     key={i}
-                    className={`rounded-2xl border p-3.5 ${
-                      rec.type === 'warning' ? 'border-orange-200 bg-orange-50' : rec.type === 'alert' ? 'border-red-200 bg-red-50' : rec.type === 'good' ? 'border-green-200 bg-green-50' : 'border-black/5 bg-white'
-                    }`}
+                    className={`rounded-2xl border p-3.5 ${rec.type === 'warning' ? 'border-orange-200 bg-orange-50' : rec.type === 'alert' ? 'border-red-200 bg-red-50' : rec.type === 'good' ? 'border-green-200 bg-green-50' : 'border-black/5 bg-white'
+                      }`}
                   >
                     <div className="flex gap-3">
                       <span className="text-xl">{rec.icon}</span>

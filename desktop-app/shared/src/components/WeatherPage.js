@@ -159,6 +159,7 @@ const WeatherPage = () => {
       setLocation(loc);
       const res = await getWeatherForLocation(loc.lat, loc.lon);
       if (res.success && res.weather) {
+        setLocation({ ...loc, city: res.location, county: res.county });
         setWeather(res.weather);
       } else {
         throw new Error('No weather');
@@ -330,9 +331,8 @@ const WeatherPage = () => {
               key={key}
               type="button"
               onClick={() => setSelectedCrop(selectedCrop === key ? null : key)}
-              className={`kc-card p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover ${
-                selectedCrop === key ? 'ring-2 ring-primary' : ''
-              }`}
+              className={`kc-card p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover ${selectedCrop === key ? 'ring-2 ring-primary' : ''
+                }`}
             >
               <div className="text-4xl">{crop.icon}</div>
               <div className="mt-2 text-sm font-bold text-[#1f2937]">{crop.name}</div>
@@ -340,9 +340,8 @@ const WeatherPage = () => {
                 {crop.tempRange[0]}–{crop.tempRange[1]}°C
               </div>
               <ChevronDown
-                className={`mx-auto mt-2 h-4 w-4 text-primary transition-transform ${
-                  selectedCrop === key ? 'rotate-180' : ''
-                }`}
+                className={`mx-auto mt-2 h-4 w-4 text-primary transition-transform ${selectedCrop === key ? 'rotate-180' : ''
+                  }`}
               />
             </button>
           ))}
