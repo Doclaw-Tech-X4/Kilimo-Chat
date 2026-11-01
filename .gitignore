@@ -115,6 +115,8 @@ celerybeat.pid
 # ============================================
 backend/.env
 backend/.env.*
+!backend/.env.example
+!backend/.env.sample
 backend/config/local.py
 backend/config/production.py
 backend/instance/

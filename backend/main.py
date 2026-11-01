@@ -1,15 +1,4 @@
-"""
-KilimoChat WhatsApp Bot - Production Ready
-Complete FastAPI application with:
-- WhatsApp webhook handling (text & voice)
-- AI-powered responses (Groq LLaMA 3.3)
-- Web search integration (DuckDuckGo)
-- Voice message pipeline (Whisper transcription)
-- Language detection & translation
-- MongoDB Atlas database for user tracking & logging
 
-Run with: uvicorn main:app --reload --port 8000
-"""
 
 import os
 import sys

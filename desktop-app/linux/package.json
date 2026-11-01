@@ -35,6 +35,7 @@
     }
   },
   "allowScripts": {
-    "electron@36.9.5": true
+    "electron@36.9.5": true,
+    "electron-winstaller@5.4.0": true
   }
 }
